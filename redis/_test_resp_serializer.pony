@@ -253,9 +253,8 @@ class \nodoc\ iso _TestRespSerializerCommandRoundtrip is Property1[Array[ByteSeq
     let bytes = _RespSerializer(command)
     let buffer: Reader = Reader
     buffer.append(bytes)
-    let result = _RespParser(buffer)?
 
-    match result
+    match _RespParser(buffer)
     | let arr: RespArray =>
       h.assert_eq[USize](command.size(), arr.values.size())
       var i: USize = 0
@@ -279,6 +278,8 @@ class \nodoc\ iso _TestRespSerializerCommandRoundtrip is Property1[Array[ByteSeq
         end
         i = i + 1
       end
+    | let m: RespMalformed =>
+      h.fail("Serialized command was malformed: " + m.message)
     else
       h.fail("Serialized command did not parse to RespArray")
     end
@@ -291,12 +292,14 @@ class \nodoc\ iso _TestRespSerializerOutputIsValidResp is Property1[Array[ByteSe
 
   fun gen(): Generator[Array[ByteSeq] val] => _RespGens.command()
 
-  fun property(command: Array[ByteSeq] val, h: PropertyHelper) ? =>
+  fun property(command: Array[ByteSeq] val, h: PropertyHelper) =>
     let bytes = _RespSerializer(command)
     let buffer: Reader = Reader
     buffer.append(bytes)
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | None => h.fail("Serialized output parsed as incomplete")
+    | let m: RespMalformed =>
+      h.fail("Serialized output was malformed: " + m.message)
     end
 
 // ---------------------------------------------------------------------------

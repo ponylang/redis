@@ -62,3 +62,14 @@ primitive RespNull
   The RESP null value. Represents both null bulk strings (`$-1\r\n`) and
   null arrays (`*-1\r\n`).
   """
+
+class val RespMalformed
+  """
+  Indicates that the parser encountered malformed RESP data. The message
+  describes what was invalid. This is not part of `RespValue` — it represents
+  a protocol violation, not a valid RESP value.
+  """
+  let message: String
+
+  new val create(message': String) =>
+    message = message'

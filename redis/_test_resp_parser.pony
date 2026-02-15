@@ -16,40 +16,44 @@ class \nodoc\ iso _TestRespParserRoundtrip is Property1[RespValue]
 
   fun gen(): Generator[RespValue] => _RespGens.value()
 
-  fun property(original: RespValue, h: PropertyHelper) ? =>
+  fun property(original: RespValue, h: PropertyHelper) =>
     let bytes = _TestRespSerializer(original)
     let buffer: Reader = Reader
     buffer.append(bytes)
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | let parsed: RespValue =>
       h.assert_true(
         _RespValueEq(original, parsed),
         "Roundtrip mismatch")
     | None =>
       h.fail("Complete serialized value parsed as incomplete")
+    | let m: RespMalformed =>
+      h.fail("Complete serialized value was malformed: " + m.message)
     end
 
 class \nodoc\ iso _TestRespParserValidBytesAlwaysParse is Property1[RespValue]
   """
   Verify that serialized RespValues always parse successfully (never
-  return None, never error).
+  return None, never return RespMalformed).
   """
   fun name(): String => "RespParser/ValidBytesAlwaysParse/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
 
-  fun property(value: RespValue, h: PropertyHelper) ? =>
+  fun property(value: RespValue, h: PropertyHelper) =>
     let bytes = _TestRespSerializer(value)
     let buffer: Reader = Reader
     buffer.append(bytes)
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | None => h.fail("Valid RESP bytes parsed as incomplete")
+    | let m: RespMalformed =>
+      h.fail("Valid RESP bytes were malformed: " + m.message)
     end
 
 class \nodoc\ iso _TestRespParserIncompleteReturnsNone is Property1[RespValue]
   """
   Verify that every proper prefix of a serialized RespValue parses as None
-  (incomplete), not as a valid value and not as an error.
+  (incomplete), not as a valid value and not as malformed.
   """
   fun name(): String => "RespParser/IncompleteReturnsNone/Property"
 
@@ -72,27 +76,26 @@ class \nodoc\ iso _TestRespParserIncompleteReturnsNone is Property1[RespValue]
       end
       let buffer: Reader = Reader
       buffer.append(prefix)
-      try
-        match _RespParser(buffer)?
-        | let _: RespValue =>
-          // A shorter prefix parsing as a valid value is only acceptable if
-          // the value is a proper subset (e.g., nested arrays where a prefix
-          // could be a standalone value). We only fail if the prefix is truly
-          // too short to be the complete target value.
-          None
-        | None => None
-        end
-      else
+      match _RespParser(buffer)
+      | let _: RespValue =>
+        // A shorter prefix parsing as a valid value is only acceptable if
+        // the value is a proper subset (e.g., nested arrays where a prefix
+        // could be a standalone value). We only fail if the prefix is truly
+        // too short to be the complete target value.
+        None
+      | None => None
+      | let _: RespMalformed =>
         h.fail(
           "Prefix of length " + prefix_len.string() +
-          " errored instead of returning None")
+          " was malformed instead of returning None")
       end
       prefix_len = prefix_len + 1
     end
 
 class \nodoc\ iso _TestRespParserInvalidTypeByteErrors is Property1[U8]
   """
-  Verify that bytes with an invalid RESP type marker always error.
+  Verify that bytes with an invalid RESP type marker always return
+  RespMalformed.
   """
   fun name(): String => "RespParser/InvalidTypeByteErrors/Property"
 
@@ -109,11 +112,15 @@ class \nodoc\ iso _TestRespParserInvalidTypeByteErrors is Property1[U8]
     let bytes: Array[U8] val = recover val
       [type_byte; 'x'; '\r'; '\n']
     end
-    h.assert_error({() ? =>
-      let buffer: Reader = Reader
-      buffer.append(bytes)
-      _RespParser(buffer)?
-    }, "Invalid type byte " + type_byte.string() + " did not error")
+    let buffer: Reader = Reader
+    buffer.append(bytes)
+    match _RespParser(buffer)
+    | let _: RespMalformed => None
+    else
+      h.fail(
+        "Invalid type byte " + type_byte.string() +
+        " did not return RespMalformed")
+    end
 
 // ---------------------------------------------------------------------------
 // Parser example-based tests
@@ -122,9 +129,9 @@ class \nodoc\ iso _TestRespParserInvalidTypeByteErrors is Property1[U8]
 class \nodoc\ iso _TestRespParserEmptyBuffer is UnitTest
   fun name(): String => "RespParser/EmptyBuffer"
 
-  fun apply(h: TestHelper) ? =>
+  fun apply(h: TestHelper) =>
     let buffer: Reader = Reader
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | None => None
     else
       h.fail("Empty buffer should return None")
@@ -133,11 +140,11 @@ class \nodoc\ iso _TestRespParserEmptyBuffer is UnitTest
 class \nodoc\ iso _TestRespParserSimpleString is UnitTest
   fun name(): String => "RespParser/SimpleString"
 
-  fun apply(h: TestHelper) ? =>
+  fun apply(h: TestHelper) =>
     // +OK\r\n
     let buffer: Reader = Reader
     buffer.append([as U8: '+'; 'O'; 'K'; '\r'; '\n'])
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | let s: RespSimpleString => h.assert_eq[String]("OK", s.value)
     else
       h.fail("Expected RespSimpleString")
@@ -146,7 +153,7 @@ class \nodoc\ iso _TestRespParserSimpleString is UnitTest
     // Empty simple string: +\r\n
     let buffer2: Reader = Reader
     buffer2.append([as U8: '+'; '\r'; '\n'])
-    match _RespParser(buffer2)?
+    match _RespParser(buffer2)
     | let s: RespSimpleString => h.assert_eq[String]("", s.value)
     else
       h.fail("Expected empty RespSimpleString")
@@ -155,7 +162,7 @@ class \nodoc\ iso _TestRespParserSimpleString is UnitTest
 class \nodoc\ iso _TestRespParserError is UnitTest
   fun name(): String => "RespParser/Error"
 
-  fun apply(h: TestHelper) ? =>
+  fun apply(h: TestHelper) =>
     let buffer: Reader = Reader
     let bytes: Array[U8] val = recover val
       let a = Array[U8]
@@ -166,7 +173,7 @@ class \nodoc\ iso _TestRespParserError is UnitTest
       a
     end
     buffer.append(bytes)
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | let e: RespError =>
       h.assert_eq[String]("ERR unknown command", e.message)
     else
@@ -176,15 +183,15 @@ class \nodoc\ iso _TestRespParserError is UnitTest
 class \nodoc\ iso _TestRespParserInteger is UnitTest
   fun name(): String => "RespParser/Integer"
 
-  fun apply(h: TestHelper) ? =>
+  fun apply(h: TestHelper) =>
     // :0
-    _assert_integer(h, [as U8: ':'; '0'; '\r'; '\n'], 0)?
+    _assert_integer(h, [as U8: ':'; '0'; '\r'; '\n'], 0)
 
     // :42
-    _assert_integer(h, [as U8: ':'; '4'; '2'; '\r'; '\n'], 42)?
+    _assert_integer(h, [as U8: ':'; '4'; '2'; '\r'; '\n'], 42)
 
     // :-1
-    _assert_integer(h, [as U8: ':'; '-'; '1'; '\r'; '\n'], -1)?
+    _assert_integer(h, [as U8: ':'; '-'; '1'; '\r'; '\n'], -1)
 
     // I64 max: 9223372036854775807
     let max_bytes: Array[U8] val = recover val
@@ -195,7 +202,7 @@ class \nodoc\ iso _TestRespParserInteger is UnitTest
       a.push('\n')
       a
     end
-    _assert_integer(h, max_bytes, I64.max_value())?
+    _assert_integer(h, max_bytes, I64.max_value())
 
     // I64 min: -9223372036854775808
     let min_bytes: Array[U8] val = recover val
@@ -206,14 +213,12 @@ class \nodoc\ iso _TestRespParserInteger is UnitTest
       a.push('\n')
       a
     end
-    _assert_integer(h, min_bytes, I64.min_value())?
+    _assert_integer(h, min_bytes, I64.min_value())
 
-  fun _assert_integer(h: TestHelper, bytes: Array[U8] val, expected: I64)
-    ?
-  =>
+  fun _assert_integer(h: TestHelper, bytes: Array[U8] val, expected: I64) =>
     let buffer: Reader = Reader
     buffer.append(bytes)
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | let i: RespInteger =>
       h.assert_eq[I64](expected, i.value)
     else
@@ -223,13 +228,13 @@ class \nodoc\ iso _TestRespParserInteger is UnitTest
 class \nodoc\ iso _TestRespParserBulkString is UnitTest
   fun name(): String => "RespParser/BulkString"
 
-  fun apply(h: TestHelper) ? =>
+  fun apply(h: TestHelper) =>
     // $6\r\nfoobar\r\n
     let buffer: Reader = Reader
     buffer.append([as U8:
       '$'; '6'; '\r'; '\n'
       'f'; 'o'; 'o'; 'b'; 'a'; 'r'; '\r'; '\n'])
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | let b: RespBulkString =>
       h.assert_array_eq[U8](
         [as U8: 'f'; 'o'; 'o'; 'b'; 'a'; 'r'], b.value)
@@ -240,7 +245,7 @@ class \nodoc\ iso _TestRespParserBulkString is UnitTest
     // Empty bulk string: $0\r\n\r\n
     let buffer2: Reader = Reader
     buffer2.append([as U8: '$'; '0'; '\r'; '\n'; '\r'; '\n'])
-    match _RespParser(buffer2)?
+    match _RespParser(buffer2)
     | let b: RespBulkString =>
       h.assert_eq[USize](0, b.value.size())
     else
@@ -250,7 +255,7 @@ class \nodoc\ iso _TestRespParserBulkString is UnitTest
     // Null bulk string: $-1\r\n
     let buffer3: Reader = Reader
     buffer3.append([as U8: '$'; '-'; '1'; '\r'; '\n'])
-    match _RespParser(buffer3)?
+    match _RespParser(buffer3)
     | RespNull => None
     else
       h.fail("Expected RespNull from $-1")
@@ -261,7 +266,7 @@ class \nodoc\ iso _TestRespParserBulkString is UnitTest
     buffer4.append([as U8:
       '$'; '4'; '\r'; '\n'
       'a'; 'b'; '\r'; '\n'; '\r'; '\n'])
-    match _RespParser(buffer4)?
+    match _RespParser(buffer4)
     | let b: RespBulkString =>
       h.assert_array_eq[U8]([as U8: 'a'; 'b'; '\r'; '\n'], b.value)
     else
@@ -275,7 +280,7 @@ class \nodoc\ iso _TestRespParserArray is UnitTest
     // Empty array: *0\r\n
     let buffer: Reader = Reader
     buffer.append([as U8: '*'; '0'; '\r'; '\n'])
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | let a: RespArray =>
       h.assert_eq[USize](0, a.values.size())
     else
@@ -285,7 +290,7 @@ class \nodoc\ iso _TestRespParserArray is UnitTest
     // Null array: *-1\r\n
     let buffer2: Reader = Reader
     buffer2.append([as U8: '*'; '-'; '1'; '\r'; '\n'])
-    match _RespParser(buffer2)?
+    match _RespParser(buffer2)
     | RespNull => None
     else
       h.fail("Expected RespNull from *-1")
@@ -297,7 +302,7 @@ class \nodoc\ iso _TestRespParserArray is UnitTest
       '*'; '2'; '\r'; '\n'
       '$'; '3'; '\r'; '\n'; 'f'; 'o'; 'o'; '\r'; '\n'
       '$'; '3'; '\r'; '\n'; 'b'; 'a'; 'r'; '\r'; '\n'])
-    match _RespParser(buffer3)?
+    match _RespParser(buffer3)
     | let a: RespArray =>
       h.assert_eq[USize](2, a.values.size())
       match a.values(0)?
@@ -322,7 +327,7 @@ class \nodoc\ iso _TestRespParserArray is UnitTest
       '*'; '1'; '\r'; '\n'
       '*'; '1'; '\r'; '\n'
       ':'; '4'; '2'; '\r'; '\n'])
-    match _RespParser(buffer4)?
+    match _RespParser(buffer4)
     | let outer: RespArray =>
       h.assert_eq[USize](1, outer.values.size())
       match outer.values(0)?
@@ -348,7 +353,7 @@ class \nodoc\ iso _TestRespParserMultipleValues is UnitTest
   """
   fun name(): String => "RespParser/MultipleValues"
 
-  fun apply(h: TestHelper) ? =>
+  fun apply(h: TestHelper) =>
     let buffer: Reader = Reader
     // Two values: +OK\r\n:42\r\n
     buffer.append([as U8:
@@ -356,7 +361,7 @@ class \nodoc\ iso _TestRespParserMultipleValues is UnitTest
       ':'; '4'; '2'; '\r'; '\n'])
 
     // Parse first value
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | let s: RespSimpleString =>
       h.assert_eq[String]("OK", s.value)
     else
@@ -364,7 +369,7 @@ class \nodoc\ iso _TestRespParserMultipleValues is UnitTest
     end
 
     // Parse second value
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | let i: RespInteger =>
       h.assert_eq[I64](42, i.value)
     else
@@ -372,7 +377,7 @@ class \nodoc\ iso _TestRespParserMultipleValues is UnitTest
     end
 
     // Buffer should be exhausted
-    match _RespParser(buffer)?
+    match _RespParser(buffer)
     | None => None
     else
       h.fail("Third parse should return None")
@@ -380,28 +385,34 @@ class \nodoc\ iso _TestRespParserMultipleValues is UnitTest
 
 class \nodoc\ iso _TestRespParserMalformedErrors is UnitTest
   """
-  Verify that malformed RESP data raises errors.
+  Verify that malformed RESP data returns RespMalformed.
   """
   fun name(): String => "RespParser/MalformedErrors"
 
   fun apply(h: TestHelper) =>
     // Invalid bulk string length: $-2\r\n
-    h.assert_error({() ? =>
-      let buffer: Reader = Reader
-      buffer.append([as U8: '$'; '-'; '2'; '\r'; '\n'])
-      _RespParser(buffer)?
-    }, "Negative length other than -1 should error")
+    let buffer: Reader = Reader
+    buffer.append([as U8: '$'; '-'; '2'; '\r'; '\n'])
+    match _RespParser(buffer)
+    | let _: RespMalformed => None
+    else
+      h.fail("Negative length other than -1 should return RespMalformed")
+    end
 
     // Non-numeric integer: :abc\r\n
-    h.assert_error({() ? =>
-      let buffer: Reader = Reader
-      buffer.append([as U8: ':'; 'a'; 'b'; 'c'; '\r'; '\n'])
-      _RespParser(buffer)?
-    }, "Non-numeric integer should error")
+    let buffer2: Reader = Reader
+    buffer2.append([as U8: ':'; 'a'; 'b'; 'c'; '\r'; '\n'])
+    match _RespParser(buffer2)
+    | let _: RespMalformed => None
+    else
+      h.fail("Non-numeric integer should return RespMalformed")
+    end
 
     // Non-numeric bulk string length: $abc\r\n
-    h.assert_error({() ? =>
-      let buffer: Reader = Reader
-      buffer.append([as U8: '$'; 'a'; 'b'; 'c'; '\r'; '\n'])
-      _RespParser(buffer)?
-    }, "Non-numeric length should error")
+    let buffer3: Reader = Reader
+    buffer3.append([as U8: '$'; 'a'; 'b'; 'c'; '\r'; '\n'])
+    match _RespParser(buffer3)
+    | let _: RespMalformed => None
+    else
+      h.fail("Non-numeric length should return RespMalformed")
+    end
