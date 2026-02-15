@@ -1,0 +1,16 @@
+{
+  "packages": [
+    "redis"
+  ],
+  "info": {
+    "description": "Redis client for Pony",
+    "homepage": "https://github.com/ponylang/redis",
+    "license": "BSD-2-Clause",
+    "documentation_url": "https://ponylang.github.io/redis/",
+    "version": "0.0.0",
+    "name": "redis"
+  },
+  "deps": [
+    {}
+  ]
+}
