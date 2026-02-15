@@ -51,6 +51,11 @@ primitive _RespParser
     """
     Scan for \r\n starting after the type byte at offset. Returns total byte
     count from offset to end of \r\n (inclusive), or None if \r\n not found.
+
+    This method requires a full \r\n sequence — bare \n is not accepted.
+    _parse depends on this: it uses Reader.line() which accepts bare \n,
+    but is only called after _complete_size (which delegates here) confirms
+    the data has proper \r\n terminators.
     """
     var i = offset + 1
     let buf_size = buffer.size()
@@ -178,9 +183,8 @@ primitive _RespParser
     _complete_size has confirmed the value is complete.
 
     This method uses Reader.line() which accepts bare \n as a line
-    terminator, but RESP requires \r\n. This is safe because _complete_size
-    validates \r\n explicitly before _parse runs — a future change to
-    _complete_size that relaxes \r\n validation would break this guarantee.
+    terminator, but RESP requires \r\n. See _line_size docstring for the
+    coupling guarantee that makes this safe.
     """
     let type_byte = buffer.u8()?
     match type_byte
