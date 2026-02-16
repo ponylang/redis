@@ -52,9 +52,15 @@ integration-tests: $(tests_binary)
 
 start-redis:
 	@docker run --name redis -p 6379:6379 -d redis:7
+	@docker run --name redis-ssl \
+		-v $(CURDIR)/assets/test-cert.pem:/tls/redis.crt:ro \
+		-v $(CURDIR)/assets/test-key.pem:/tls/redis.key.orig:ro \
+		-p 6380:6379 \
+		-d --entrypoint sh redis:7 \
+		-c "cp /tls/redis.key.orig /tls/redis.key && chmod 600 /tls/redis.key && exec redis-server --tls-port 6379 --port 0 --tls-cert-file /tls/redis.crt --tls-key-file /tls/redis.key --tls-auth-clients no"
 
 stop-redis:
-	@docker stop redis && docker rm redis
+	@docker stop redis redis-ssl && docker rm redis redis-ssl
 
 $(tests_binary): $(SOURCE_FILES) | $(BUILD_DIR)
 	$(GET_DEPENDENCIES_WITH)

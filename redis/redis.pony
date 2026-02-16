@@ -31,7 +31,8 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
 
 ## Session API
 
-* `ConnectInfo` — connection configuration (host, port, optional password)
+* `ConnectInfo` — connection configuration (host, port, optional password,
+  SSL mode)
 * `Session` — the main entry point; manages connection lifecycle
 * `SessionStatusNotify` — lifecycle callbacks (connected, ready, closed, etc.)
 * `ResultReceiver` — command result callbacks
@@ -76,8 +77,25 @@ notification when the connection closes; `redis_session_closed` fires on
 
 ## Security
 
-Redis AUTH sends the password in plaintext over TCP. Use SSL/TLS when
-authenticating over untrusted networks.
+Redis AUTH sends the password in plaintext over TCP. Use `SSLRequired` to
+encrypt the connection:
+
+```pony
+use "ssl/net"
+
+// SSLContext.set_authority() is partial
+let sslctx: SSLContext val =
+  recover val
+    SSLContext
+      .> set_authority(FilePath(file_auth, "/path/to/ca.pem"))?
+  end
+let info = ConnectInfo(auth, host, "6380" where
+  ssl_mode' = SSLRequired(sslctx))
+let session = Session(info, notify)
+```
+
+Redis uses direct TLS (typically on port 6380) rather than STARTTLS
+negotiation.
 
 ## RESP2 Value Types
 

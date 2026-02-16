@@ -48,6 +48,13 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      redis-ssl:
+        image: ghcr.io/ponylang/redis-ci-redis-ssl:latest
+        options: >-
+          --health-cmd "redis-cli --tls --insecure ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4.1.1
       - name: Unit tests
@@ -57,5 +64,7 @@ jobs:
         env:
           REDIS_HOST: redis
           REDIS_PORT: 6379
+          REDIS_SSL_HOST: redis-ssl
+          REDIS_SSL_PORT: 6379
       - name: Build examples
         run: make build-examples config=debug ssl=libressl
