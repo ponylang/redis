@@ -20,3 +20,12 @@ primitive SessionClosed is ClientError
   connection or authentication failures.
   """
   fun message(): String => "Session is closed"
+
+primitive SessionInSubscribedMode is ClientError
+  """
+  Error returned when `execute()` is called on a session that is in
+  pub/sub subscribed mode. Commands cannot be sent while subscribed —
+  unsubscribe from all channels and patterns first, or use a separate
+  session for commands.
+  """
+  fun message(): String => "Session is in subscribed mode"

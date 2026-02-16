@@ -46,3 +46,7 @@ actor \nodoc\ Main is TestList
     test(_TestSessionPipelineMixedResponses)
     test(_TestSessionPipelineClose)
     test(_TestSessionServerError)
+    test(_TestSessionPubSub)
+    test(_TestSessionPubSubPattern)
+    test(_TestSessionExecuteWhileSubscribed)
+    test(_TestSessionPubSubBackToReady)

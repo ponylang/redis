@@ -613,3 +613,304 @@ actor \nodoc\ _ServerErrorClient is (SessionStatusNotify & ResultReceiver)
   be redis_session_connection_failed(session: Session) =>
     _h.fail("Connection failed")
     _h.complete(false)
+
+// integration/Session/PubSub
+
+class \nodoc\ iso _TestSessionPubSub is UnitTest
+  fun name(): String =>
+    "integration/Session/PubSub"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    _PubSubClient(h, auth, info.host, info.port)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _PubSubClient is
+  (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
+  let _h: TestHelper
+  let _subscriber: Session
+  let _publisher: Session
+  var _ready_count: USize = 0
+
+  new create(h: TestHelper, auth: lori.TCPConnectAuth,
+    host: String, port: String)
+  =>
+    _h = h
+    _subscriber = Session(ConnectInfo(auth, host, port), this)
+    _publisher = Session(ConnectInfo(auth, host, port), this)
+    h.dispose_when_done(_subscriber)
+    h.dispose_when_done(_publisher)
+
+  be redis_session_ready(session: Session) =>
+    _ready_count = _ready_count + 1
+    if _ready_count == 2 then
+      let channels: Array[String] val = ["_test_pubsub"]
+      _subscriber.subscribe(channels, this)
+    end
+
+  be redis_subscribed(session: Session, channel: String,
+    count: USize)
+  =>
+    let cmd: Array[ByteSeq] val = ["PUBLISH"; "_test_pubsub"; "hello"]
+    _publisher.execute(cmd, this)
+
+  be redis_message(session: Session, channel: String,
+    data: Array[U8] val)
+  =>
+    if channel != "_test_pubsub" then
+      _h.fail("Expected channel '_test_pubsub', got: '" + channel + "'")
+      _h.complete(false)
+      return
+    end
+    if String.from_array(data) != "hello" then
+      _h.fail("Expected data 'hello', got: '"
+        + String.from_array(data) + "'")
+      _h.complete(false)
+      return
+    end
+    let channels: Array[String] val = ["_test_pubsub"]
+    _subscriber.unsubscribe(channels)
+
+  be redis_unsubscribed(session: Session, channel: String,
+    count: USize)
+  =>
+    if count == 0 then
+      _h.complete(true)
+    end
+
+  be redis_response(session: Session, response: RespValue) =>
+    // PUBLISH response — ignore.
+    None
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    _h.fail("Command failed: " + failure.message())
+    _h.complete(false)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection failed")
+    _h.complete(false)
+
+// integration/Session/PubSubPattern
+
+class \nodoc\ iso _TestSessionPubSubPattern is UnitTest
+  fun name(): String =>
+    "integration/Session/PubSubPattern"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    _PubSubPatternClient(h, auth, info.host, info.port)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _PubSubPatternClient is
+  (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
+  let _h: TestHelper
+  let _subscriber: Session
+  let _publisher: Session
+  var _ready_count: USize = 0
+
+  new create(h: TestHelper, auth: lori.TCPConnectAuth,
+    host: String, port: String)
+  =>
+    _h = h
+    _subscriber = Session(ConnectInfo(auth, host, port), this)
+    _publisher = Session(ConnectInfo(auth, host, port), this)
+    h.dispose_when_done(_subscriber)
+    h.dispose_when_done(_publisher)
+
+  be redis_session_ready(session: Session) =>
+    _ready_count = _ready_count + 1
+    if _ready_count == 2 then
+      let patterns: Array[String] val = ["_test_pubsub_p:*"]
+      _subscriber.psubscribe(patterns, this)
+    end
+
+  be redis_psubscribed(session: Session, pattern: String,
+    count: USize)
+  =>
+    let cmd: Array[ByteSeq] val =
+      ["PUBLISH"; "_test_pubsub_p:foo"; "hello"]
+    _publisher.execute(cmd, this)
+
+  be redis_pmessage(session: Session, pattern: String,
+    channel: String, data: Array[U8] val)
+  =>
+    if pattern != "_test_pubsub_p:*" then
+      _h.fail("Expected pattern '_test_pubsub_p:*', got: '"
+        + pattern + "'")
+      _h.complete(false)
+      return
+    end
+    if channel != "_test_pubsub_p:foo" then
+      _h.fail("Expected channel '_test_pubsub_p:foo', got: '"
+        + channel + "'")
+      _h.complete(false)
+      return
+    end
+    if String.from_array(data) != "hello" then
+      _h.fail("Expected data 'hello', got: '"
+        + String.from_array(data) + "'")
+      _h.complete(false)
+      return
+    end
+    let patterns: Array[String] val = ["_test_pubsub_p:*"]
+    _subscriber.punsubscribe(patterns)
+
+  be redis_punsubscribed(session: Session, pattern: String,
+    count: USize)
+  =>
+    if count == 0 then
+      _h.complete(true)
+    end
+
+  be redis_response(session: Session, response: RespValue) =>
+    // PUBLISH response — ignore.
+    None
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    _h.fail("Command failed: " + failure.message())
+    _h.complete(false)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection failed")
+    _h.complete(false)
+
+// integration/Session/ExecuteWhileSubscribed
+
+class \nodoc\ iso _TestSessionExecuteWhileSubscribed is UnitTest
+  fun name(): String =>
+    "integration/Session/ExecuteWhileSubscribed"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    let client = _ExecuteWhileSubscribedClient(h)
+    let session = Session(
+      ConnectInfo(auth, info.host, info.port),
+      client)
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _ExecuteWhileSubscribedClient is
+  (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
+  let _h: TestHelper
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_ready(session: Session) =>
+    let channels: Array[String] val = ["_test_exec_subscribed"]
+    session.subscribe(channels, this)
+
+  be redis_subscribed(session: Session, channel: String,
+    count: USize)
+  =>
+    let cmd: Array[ByteSeq] val = ["PING"]
+    session.execute(cmd, this)
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    match failure
+    | SessionInSubscribedMode =>
+      // Clean up by unsubscribing.
+      let channels: Array[String] val = ["_test_exec_subscribed"]
+      session.unsubscribe(channels)
+    else
+      _h.fail("Expected SessionInSubscribedMode, got: "
+        + failure.message())
+      _h.complete(false)
+    end
+
+  be redis_unsubscribed(session: Session, channel: String,
+    count: USize)
+  =>
+    if count == 0 then
+      _h.complete(true)
+    end
+
+  be redis_response(session: Session, response: RespValue) =>
+    _h.fail("Should not have received a response while subscribed")
+    _h.complete(false)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection failed")
+    _h.complete(false)
+
+// integration/Session/PubSubBackToReady
+
+class \nodoc\ iso _TestSessionPubSubBackToReady is UnitTest
+  fun name(): String =>
+    "integration/Session/PubSubBackToReady"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    let client = _PubSubBackToReadyClient(h)
+    let session = Session(
+      ConnectInfo(auth, info.host, info.port),
+      client)
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _PubSubBackToReadyClient is
+  (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
+  let _h: TestHelper
+  var _was_subscribed: Bool = false
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_ready(session: Session) =>
+    if _was_subscribed then
+      // Second time ready — execute a command to verify.
+      let cmd: Array[ByteSeq] val = ["PING"]
+      session.execute(cmd, this)
+    else
+      // First time ready — subscribe.
+      let channels: Array[String] val = ["_test_pubsub_back"]
+      session.subscribe(channels, this)
+    end
+
+  be redis_subscribed(session: Session, channel: String,
+    count: USize)
+  =>
+    _was_subscribed = true
+    let channels: Array[String] val = ["_test_pubsub_back"]
+    session.unsubscribe(channels)
+
+  be redis_unsubscribed(session: Session, channel: String,
+    count: USize)
+  =>
+    // Transition back to ready happens when count == 0.
+    // redis_session_ready will fire and we verify with PING.
+    None
+
+  be redis_response(session: Session, response: RespValue) =>
+    match response
+    | let s: RespSimpleString =>
+      if s.value == "PONG" then
+        _h.complete(true)
+      else
+        _h.fail("Expected PONG, got: " + s.value)
+        _h.complete(false)
+      end
+    else
+      _h.fail("Expected RespSimpleString")
+      _h.complete(false)
+    end
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    _h.fail("Command failed: " + failure.message())
+    _h.complete(false)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection failed")
+    _h.complete(false)
