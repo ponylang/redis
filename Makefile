@@ -58,9 +58,10 @@ start-redis:
 		-p 6380:6379 \
 		-d --entrypoint sh redis:7 \
 		-c "cp /tls/redis.key.orig /tls/redis.key && chmod 600 /tls/redis.key && exec redis-server --tls-port 6379 --port 0 --tls-cert-file /tls/redis.crt --tls-key-file /tls/redis.key --tls-auth-clients no"
+	@docker run --name redis-resp2 -p 6381:6379 -d redis:5
 
 stop-redis:
-	@docker stop redis redis-ssl && docker rm redis redis-ssl
+	@docker stop redis redis-ssl redis-resp2 && docker rm redis redis-ssl redis-resp2
 
 $(tests_binary): $(SOURCE_FILES) | $(BUILD_DIR)
 	$(GET_DEPENDENCIES_WITH)

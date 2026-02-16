@@ -29,6 +29,13 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      redis-resp2:
+        image: redis:5
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4.1.1
       - name: Unit tests
@@ -40,6 +47,8 @@ jobs:
           REDIS_PORT: 6379
           REDIS_SSL_HOST: redis-ssl
           REDIS_SSL_PORT: 6379
+          REDIS_RESP2_HOST: redis-resp2
+          REDIS_RESP2_PORT: 6379
       - name: Build examples
         run: make build-examples config=debug ssl=libressl
       - name: Send alert on failure

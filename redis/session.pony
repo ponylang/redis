@@ -126,6 +126,7 @@ interface _SessionState
   fun ref on_received(s: Session ref, data: Array[U8] iso)
   fun ref on_closed(s: Session ref)
   fun ref on_response(s: Session ref, response: RespValue)
+  fun ref on_push(s: Session ref, push: RespPush)
   fun ref execute(s: Session ref, command: Array[ByteSeq] val,
     receiver: ResultReceiver)
   fun ref close(s: Session ref)
@@ -210,12 +211,19 @@ trait _NotReadyForCommands is _SessionState
 
 trait _NotSubscribed is _SessionState
   """
-  Mixin for states where pub/sub operations are no-ops. Subscribe and
-  psubscribe are silently ignored because `SubscriptionNotify` has no
-  error callback — there is no delivery mechanism for the failure.
-  Unsubscribe and punsubscribe are also no-ops since there are no
-  active subscriptions to cancel.
+  Mixin for states where pub/sub operations are no-ops and push messages
+  are silently dropped. Subscribe and psubscribe are silently ignored
+  because `SubscriptionNotify` has no error callback — there is no
+  delivery mechanism for the failure. Unsubscribe and punsubscribe are
+  also no-ops since there are no active subscriptions to cancel.
+
+  Push messages (RESP3 server-initiated notifications) are dropped in
+  non-subscribed states. This is the only trait that provides `on_push`
+  to avoid diamond inheritance in `_SessionClosed`.
   """
+  fun ref on_push(s: Session ref, push: RespPush) =>
+    None
+
   fun ref subscribe(s: Session ref, channels: Array[String] val,
     sub_notify: SubscriptionNotify)
   =>
@@ -247,15 +255,22 @@ class ref _SessionUnopened is (_NotReadyForCommands & _NotSubscribed)
 
   fun on_connected(s: Session ref) =>
     _notify.redis_session_connected(s)
-    match _connect_info.password
-    | let password: String =>
-      let st = _SessionConnected(_notify)
-      s.state = st
-      let cmd: Array[ByteSeq] val = ["AUTH"; password]
+    match _connect_info.protocol
+    | Resp3 =>
+      let cmd = _BuildHelloCommand(_connect_info)
+      s.state = _SessionNegotiating(_notify, _connect_info)
       s._connection().send(_RespSerializer(cmd))
-    | None =>
-      s.state = _SessionReady(_notify)
-      _notify.redis_session_ready(s)
+    | Resp2 =>
+      match _connect_info.password
+      | let password: String =>
+        let st = _SessionConnected(_notify)
+        s.state = st
+        let cmd = _BuildAuthCommand(_connect_info.username, password)
+        s._connection().send(_RespSerializer(cmd))
+      | None =>
+        s.state = _SessionReady(_notify)
+        _notify.redis_session_ready(s)
+      end
     end
 
   fun on_failure(s: Session ref) =>
@@ -280,20 +295,85 @@ class ref _SessionUnopened is (_NotReadyForCommands & _NotSubscribed)
   fun ref shutdown(s: Session ref) =>
     s._connection().close()
 
+class ref _SessionNegotiating is
+  (_ConnectedState & _NotReadyForCommands & _NotSubscribed)
+  """
+  TCP connected, HELLO command sent, waiting for the server's response.
+  If the server supports RESP3, the response is a map with server info
+  and the session transitions to ready. If the server doesn't support
+  HELLO, the response is an error and the session falls back to RESP2,
+  optionally sending AUTH if a password is configured.
+  """
+  let _notify: SessionStatusNotify
+  let _readbuf: Reader = _readbuf.create()
+  let _connect_info: ConnectInfo
+
+  new ref create(notify': SessionStatusNotify,
+    connect_info': ConnectInfo)
+  =>
+    _notify = notify'
+    _connect_info = connect_info'
+
+  fun ref on_response(s: Session ref, response: RespValue) =>
+    match response
+    | let _: RespMap =>
+      s.state = _SessionReady.from_connected(_notify, _readbuf)
+      _notify.redis_session_ready(s)
+    | let err: RespError =>
+      // HELLO not supported — fall back to RESP2.
+      match _connect_info.password
+      | let password: String =>
+        let cmd = _BuildAuthCommand(_connect_info.username, password)
+        s.state = _SessionConnected.from_negotiating(_notify, _readbuf)
+        s._connection().send(_RespSerializer(cmd))
+      | None =>
+        s.state = _SessionReady.from_connected(_notify, _readbuf)
+        _notify.redis_session_ready(s)
+      end
+    else
+      // Unexpected HELLO response — protocol violation.
+      shutdown(s)
+    end
+
+  fun ref on_closed(s: Session ref) =>
+    _readbuf.clear()
+    s.state = _SessionClosed
+    _notify.redis_session_closed(s)
+
+  fun ref close(s: Session ref) =>
+    s._connection().close()
+
+  fun ref shutdown(s: Session ref) =>
+    _readbuf.clear()
+    s._connection().close()
+    s.state = _SessionClosed
+    _notify.redis_session_closed(s)
+
+  fun ref readbuf(): Reader =>
+    _readbuf
+
+  fun notify(): SessionStatusNotify =>
+    _notify
+
 class ref _SessionConnected is
   (_ConnectedState & _NotReadyForCommands & _NotSubscribed)
   """
   TCP connected, AUTH command sent, waiting for the server's response.
 
-  AUTH is sent from `_SessionUnopened.on_connected` after transitioning
-  to this state (not from the constructor — constructors don't have
-  `Session ref`).
+  AUTH is sent from `_SessionUnopened.on_connected` (or from
+  `_SessionNegotiating.on_response` during HELLO fallback) after
+  transitioning to this state.
   """
   let _notify: SessionStatusNotify
-  let _readbuf: Reader = _readbuf.create()
+  let _readbuf: Reader
 
   new ref create(notify': SessionStatusNotify) =>
     _notify = notify'
+    _readbuf = Reader
+
+  new ref from_negotiating(notify': SessionStatusNotify, readbuf': Reader) =>
+    _notify = notify'
+    _readbuf = readbuf'
 
   fun ref on_response(s: Session ref, response: RespValue) =>
     match response
@@ -460,6 +540,9 @@ class ref _SessionSubscribed is _ConnectedState
   =>
     receiver.redis_command_failed(s, command, SessionInSubscribedMode)
 
+  fun ref on_push(s: Session ref, push: RespPush) =>
+    _dispatch_pubsub_values(s, push.values)
+
   // Changing this method's drain-then-route logic requires understanding
   // why the pending queue is drained first: Redis guarantees that
   // responses to commands pipelined before SUBSCRIBE are delivered before
@@ -478,18 +561,20 @@ class ref _SessionSubscribed is _ConnectedState
       return
     end
     match response
-    | let arr: RespArray => _dispatch_pubsub(s, arr)
+    | let arr: RespArray => _dispatch_pubsub_values(s, arr.values)
     else
       shutdown(s)
     end
 
-  fun ref _dispatch_pubsub(s: Session ref, arr: RespArray) =>
+  fun ref _dispatch_pubsub_values(s: Session ref,
+    values: Array[RespValue] val)
+  =>
     try
-      match arr.values(0)?
+      match values(0)?
       | let type_bs: RespBulkString =>
         let msg_type = String.from_array(type_bs.value)
         if msg_type == "subscribe" then
-          match (arr.values(1)?, arr.values(2)?)
+          match (values(1)?, values(2)?)
           | (let ch: RespBulkString, let cnt: RespInteger) =>
             _sub_notify.redis_subscribed(s, String.from_array(ch.value),
               cnt.value.usize())
@@ -497,7 +582,7 @@ class ref _SessionSubscribed is _ConnectedState
             shutdown(s)
           end
         elseif msg_type == "unsubscribe" then
-          match (arr.values(1)?, arr.values(2)?)
+          match (values(1)?, values(2)?)
           | (let ch: RespBulkString, let cnt: RespInteger) =>
             let count = cnt.value.usize()
             _sub_notify.redis_unsubscribed(s, String.from_array(ch.value),
@@ -510,7 +595,7 @@ class ref _SessionSubscribed is _ConnectedState
             shutdown(s)
           end
         elseif msg_type == "message" then
-          match (arr.values(1)?, arr.values(2)?)
+          match (values(1)?, values(2)?)
           | (let ch: RespBulkString, let data_bs: RespBulkString) =>
             _sub_notify.redis_message(s, String.from_array(ch.value),
               data_bs.value)
@@ -518,7 +603,7 @@ class ref _SessionSubscribed is _ConnectedState
             shutdown(s)
           end
         elseif msg_type == "psubscribe" then
-          match (arr.values(1)?, arr.values(2)?)
+          match (values(1)?, values(2)?)
           | (let pat: RespBulkString, let cnt: RespInteger) =>
             _sub_notify.redis_psubscribed(s, String.from_array(pat.value),
               cnt.value.usize())
@@ -526,7 +611,7 @@ class ref _SessionSubscribed is _ConnectedState
             shutdown(s)
           end
         elseif msg_type == "punsubscribe" then
-          match (arr.values(1)?, arr.values(2)?)
+          match (values(1)?, values(2)?)
           | (let pat: RespBulkString, let cnt: RespInteger) =>
             let count = cnt.value.usize()
             _sub_notify.redis_punsubscribed(s, String.from_array(pat.value),
@@ -539,7 +624,7 @@ class ref _SessionSubscribed is _ConnectedState
             shutdown(s)
           end
         elseif msg_type == "pmessage" then
-          match (arr.values(1)?, arr.values(2)?, arr.values(3)?)
+          match (values(1)?, values(2)?, values(3)?)
           | (let pat: RespBulkString, let ch: RespBulkString,
             let data_bs: RespBulkString)
           =>
@@ -641,3 +726,35 @@ class ref _SessionClosed is (_ClosedState & _NotSubscribed)
   """
   Terminal state. The session is closed and cannot be reused.
   """
+
+primitive _BuildHelloCommand
+  """
+  Build the HELLO 3 command for RESP3 negotiation. If a password is
+  configured, includes AUTH credentials in the HELLO command.
+  """
+  fun apply(info: ConnectInfo): Array[ByteSeq] val =>
+    match info.password
+    | let password: String =>
+      let user = match info.username
+      | let u: String => u
+      | None => "default"
+      end
+      recover val [as ByteSeq: "HELLO"; "3"; "AUTH"; user; password] end
+    | None =>
+      recover val [as ByteSeq: "HELLO"; "3"] end
+    end
+
+primitive _BuildAuthCommand
+  """
+  Build an AUTH command. Includes the username for Redis 6.0+ ACL
+  authentication when provided.
+  """
+  fun apply(username: (String | None), password: String)
+    : Array[ByteSeq] val
+  =>
+    match username
+    | let user: String =>
+      recover val [as ByteSeq: "AUTH"; user; password] end
+    | None =>
+      recover val [as ByteSeq: "AUTH"; password] end
+    end

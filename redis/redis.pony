@@ -32,7 +32,7 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
 ## Session API
 
 * `ConnectInfo` — connection configuration (host, port, optional password,
-  SSL mode)
+  SSL mode, protocol version, optional username)
 * `Session` — the main entry point; manages connection lifecycle
 * `SessionStatusNotify` — lifecycle callbacks (connected, ready, closed, etc.)
 * `ResultReceiver` — command result callbacks
@@ -97,15 +97,46 @@ let session = Session(info, notify)
 Redis uses direct TLS (typically on port 6380) rather than STARTTLS
 negotiation.
 
-## RESP2 Value Types
+## RESP3
+
+To enable RESP3 protocol features, set `protocol' = Resp3` in `ConnectInfo`:
+
+```pony
+let info = ConnectInfo(auth, host where protocol' = Resp3)
+```
+
+The session sends HELLO 3 on connect. If the server supports RESP3 (Redis
+6.0+), responses may include richer types like maps, sets, booleans, and
+doubles. If the server doesn't support HELLO, the session falls back to
+RESP2 automatically.
+
+For Redis 6.0+ ACL authentication, provide a `username`:
+
+```pony
+let info = ConnectInfo(auth, host where
+  password' = "secret", username' = "myuser", protocol' = Resp3)
+```
+
+## Value Types
 
 The protocol layer uses `RespValue` as the core type for data exchanged with
 a Redis server. This is a union of:
 
+### RESP2 types
 * `RespSimpleString` — short status responses like "OK"
 * `RespBulkString` — binary-safe string data
 * `RespInteger` — signed 64-bit integers
 * `RespArray` — ordered collections of values
 * `RespError` — error responses from the server
 * `RespNull` — null/nil values
+
+### RESP3 types (require `Resp3` protocol)
+* `RespBoolean` — true/false values
+* `RespDouble` — double-precision floating-point values
+* `RespBigNumber` — arbitrary-precision integers (stored as string)
+* `RespBulkError` — binary-safe error messages
+* `RespVerbatimString` — strings with a 3-character encoding hint
+* `RespMap` — ordered key-value pairs
+* `RespSet` — unordered collections
+* `RespPush` — server-initiated out-of-band messages
 """
