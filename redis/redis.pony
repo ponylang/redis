@@ -39,6 +39,41 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
 Commands are arrays of `ByteSeq` (e.g., `["GET", "mykey"]`). Responses are
 `RespValue` variants — including `RespError` for server-side errors.
 
+## Pub/Sub
+
+To enter pub/sub mode, call `subscribe()` or `psubscribe()` on a ready
+session with a `SubscriptionNotify` receiver:
+
+```pony
+actor MySubscriber is (SessionStatusNotify & SubscriptionNotify)
+  let _session: Session
+
+  new create(env: Env) =>
+    let auth = lori.TCPConnectAuth(env.root)
+    _session = Session(ConnectInfo(auth, "localhost"), this)
+
+  be redis_session_ready(session: Session) =>
+    let channels: Array[String] val = ["my-channel"]
+    session.subscribe(channels, this)
+
+  be redis_message(session: Session, channel: String,
+    data: Array[U8] val)
+  =>
+    // handle incoming message
+    None
+```
+
+While subscribed, `execute()` is rejected with `SessionInSubscribedMode`.
+To publish messages, use a separate session — the subscribed session cannot
+send commands. When all subscriptions are cancelled (the server's
+subscription count reaches 0), the session returns to ready mode and
+`redis_session_ready` fires again.
+
+Implement `SessionStatusNotify` alongside `SubscriptionNotify` to detect
+connection loss during subscribed mode — `SubscriptionNotify` receives no
+notification when the connection closes; `redis_session_closed` fires on
+`SessionStatusNotify` instead.
+
 ## Security
 
 Redis AUTH sends the password in plaintext over TCP. Use SSL/TLS when

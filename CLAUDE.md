@@ -39,13 +39,21 @@ Package: `redis`
 
 ### Session Layer
 
-- `Session` (actor in `session.pony`): Main entry point. Manages connection lifecycle via a state machine. Implements `lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver`. All state machine classes (`_SessionUnopened`, `_SessionConnected`, `_SessionReady`, `_SessionClosed`) are in `session.pony`, following the postgres pattern.
+- `Session` (actor in `session.pony`): Main entry point. Manages connection lifecycle and pub/sub via a state machine. Implements `lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver`. All state machine classes (`_SessionUnopened`, `_SessionConnected`, `_SessionReady`, `_SessionSubscribed`, `_SessionClosed`) are in `session.pony`, following the postgres pattern.
 - `ConnectInfo` (in `connect_info.pony`): Connection configuration (host, port, optional password).
 - `SessionStatusNotify` (in `session_status_notify.pony`): Lifecycle callback interface. All callbacks have default no-op implementations. Callbacks: `redis_session_connected`, `redis_session_connection_failed`, `redis_session_ready`, `redis_session_authentication_failed`, `redis_session_closed`.
 - `ResultReceiver` (in `result_receiver.pony`): Command response callback interface. Callbacks: `redis_response`, `redis_command_failed`.
-- `ClientError` (in `client_error.pony`): Client-side error trait with `SessionNotReady` and `SessionClosed` primitives.
+- `SubscriptionNotify` (in `subscription_notify.pony`): Pub/sub callback interface. All callbacks have default no-op implementations. Callbacks: `redis_subscribed`, `redis_unsubscribed`, `redis_message`, `redis_psubscribed`, `redis_punsubscribed`, `redis_pmessage`.
+- `ClientError` (in `client_error.pony`): Client-side error trait with `SessionNotReady`, `SessionClosed`, and `SessionInSubscribedMode` primitives.
 - `_ResponseHandler` (in `_response_handler.pony`): Loops `_RespParser` over a `buffered.Reader`, delivering parsed `RespValue`s to the current state. Shuts down on `RespMalformed`.
 - `_IllegalState` / `_Unreachable` (in `_mort.pony`): Primitives for detecting impossible states.
+
+### Trait Composition
+
+- `_ClosedState`: Mixin for the terminal state — rejects or no-ops all operations.
+- `_ConnectedState`: Mixin for states with a readbuf — handles `on_received` and `_ResponseHandler` dispatch.
+- `_NotReadyForCommands`: Mixin that rejects `execute()` with `SessionNotReady`.
+- `_NotSubscribed`: Mixin that no-ops `subscribe`, `unsubscribe`, `psubscribe`, `punsubscribe` for states where pub/sub is not applicable.
 
 ### State Machine
 
@@ -56,10 +64,16 @@ _SessionUnopened ──on_connected──► _SessionConnected (if password)
 _SessionConnected ──AUTH OK──► _SessionReady
                   ──AUTH error──► _SessionClosed
 
-_SessionReady ──close/error──► _SessionClosed
+_SessionReady ──subscribe/psubscribe──► _SessionSubscribed
+              ──close/error──► _SessionClosed
+
+_SessionSubscribed ──unsub count 0──► _SessionReady
+                   ──close/error──► _SessionClosed
 ```
 
 Commands are pipelined in `_SessionReady`: each `execute()` call sends the command immediately over the wire without waiting for prior responses. Responses are matched to receivers in FIFO order.
+
+In `_SessionSubscribed`, any pipelined commands that were in-flight when SUBSCRIBE was sent are drained first (Redis guarantees in-order response delivery), then incoming responses are routed as pub/sub messages.
 
 ## Test Infrastructure
 

@@ -23,7 +23,8 @@ interface tag SessionStatusNotify
     """
     Called when the session is ready to accept commands. Fires after
     successful AUTH when a password is configured, or immediately after
-    TCP connect when no password is set.
+    TCP connect when no password is set. Also fires when the session
+    exits pub/sub subscribed mode (subscription count reaches 0).
     """
     None
 
