@@ -59,7 +59,7 @@ _SessionConnected ──AUTH OK──► _SessionReady
 _SessionReady ──close/error──► _SessionClosed
 ```
 
-Command execution in `_SessionReady` is serialized: one command in flight at a time, with a queue for pending commands.
+Commands are pipelined in `_SessionReady`: each `execute()` call sends the command immediately over the wire without waiting for prior responses. Responses are matched to receivers in FIFO order.
 
 ## Test Infrastructure
 

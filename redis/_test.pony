@@ -42,4 +42,7 @@ actor \nodoc\ Main is TestList
     test(_TestSessionExecuteBeforeReady)
     test(_TestSessionExecuteAfterClose)
     test(_TestSessionMultipleCommands)
+    test(_TestSessionPipeline)
+    test(_TestSessionPipelineMixedResponses)
+    test(_TestSessionPipelineClose)
     test(_TestSessionServerError)
