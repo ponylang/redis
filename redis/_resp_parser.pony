@@ -171,7 +171,11 @@ primitive _RespParser
       if (b < '0') or (b > '9') then
         return RespMalformed("non-digit byte in integer value")
       end
-      result = (result * 10) + (b - '0').i64()
+      result = try 
+        result.mul_partial(10)?.add_partial((b - '0').i64())?
+      else 
+        return RespMalformed("integer value out of range") 
+      end
       i = i + 1
     end
 

@@ -416,3 +416,51 @@ class \nodoc\ iso _TestRespParserMalformedErrors is UnitTest
     else
       h.fail("Non-numeric length should return RespMalformed")
     end
+
+class \nodoc\ iso _TestRespParserIntegerOverflow is UnitTest
+  """
+  Verify that integer values exceeding I64 range produce RespMalformed
+  instead of silently wrapping.
+  """
+  fun name(): String => "RespParser/IntegerOverflow"
+
+  fun apply(h: TestHelper) =>
+    // I64.max + 1 as bulk string length: $9223372036854775808\r\n
+    _assert_malformed(h,
+      _build_header('$', "9223372036854775808"),
+      "I64.max+1 as bulk string length should be malformed")
+
+    // I64.max + 1 as array count: *9223372036854775808\r\n
+    _assert_malformed(h,
+      _build_header('*', "9223372036854775808"),
+      "I64.max+1 as array count should be malformed")
+
+    // 20-digit number well beyond I64 range: $99999999999999999999\r\n
+    _assert_malformed(h,
+      _build_header('$', "99999999999999999999"),
+      "20-digit number should be malformed")
+
+    // Negative overflow — digits exceed I64.max, then negated:
+    // $-9223372036854775809\r\n
+    _assert_malformed(h,
+      _build_header('$', "-9223372036854775809"),
+      "Negative overflow should be malformed")
+
+  fun _build_header(type_byte: U8, value: String): Array[U8] val =>
+    recover val
+      let a = Array[U8]
+      a.push(type_byte)
+      for byte in value.values() do a.push(byte) end
+      a.push('\r')
+      a.push('\n')
+      a
+    end
+
+  fun _assert_malformed(h: TestHelper, bytes: Array[U8] val, msg: String) =>
+    let buffer: Reader = Reader
+    buffer.append(bytes)
+    match _RespParser(buffer)
+    | let _: RespMalformed => None
+    else
+      h.fail(msg)
+    end
