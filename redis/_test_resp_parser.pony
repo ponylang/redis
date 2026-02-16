@@ -446,6 +446,19 @@ class \nodoc\ iso _TestRespParserIntegerOverflow is UnitTest
       _build_header('$', "-9223372036854775809"),
       "Negative overflow should be malformed")
 
+    // I64.max as bulk string length should be accepted by _read_line_as_i64
+    // (returns None because the buffer lacks the data bytes, not RespMalformed)
+    let max_buf: Reader = Reader
+    max_buf.append(_build_header('$', I64.max_value().string()))
+    match _RespParser(max_buf)
+    | None => None
+    | let m: RespMalformed =>
+      h.fail("I64.max as bulk string length should not be malformed: "
+        + m.message)
+    | let _: RespValue =>
+      h.fail("I64.max as bulk string length should be incomplete, not a value")
+    end
+
   fun _build_header(type_byte: U8, value: String): Array[U8] val =>
     recover val
       let a = Array[U8]
