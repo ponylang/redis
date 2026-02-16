@@ -34,3 +34,12 @@ actor \nodoc\ Main is TestList
     test(_TestRespSerializerSingleElement)
     test(_TestRespSerializerEmptyCommand)
     test(_TestRespSerializerBinaryData)
+
+    // Session integration tests
+    test(_TestSessionConnectAndReady)
+    test(_TestSessionSetAndGet)
+    test(_TestSessionConnectionFailure)
+    test(_TestSessionExecuteBeforeReady)
+    test(_TestSessionExecuteAfterClose)
+    test(_TestSessionMultipleCommands)
+    test(_TestSessionServerError)

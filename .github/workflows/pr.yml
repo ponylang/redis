@@ -39,8 +39,23 @@ jobs:
     name: Test against recent ponyc release
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/ponylang/shared-docker-ci-standard-builder:release
+      image: ghcr.io/ponylang/shared-docker-ci-standard-builder-with-libressl-4.2.0:release
+    services:
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4.1.1
-      - name: Test
-        run: make test config=debug
+      - name: Unit tests
+        run: make unit-tests config=debug ssl=libressl
+      - name: Integration tests
+        run: make integration-tests config=debug ssl=libressl
+        env:
+          REDIS_HOST: redis
+          REDIS_PORT: 6379
+      - name: Build examples
+        run: make build-examples config=debug ssl=libressl
