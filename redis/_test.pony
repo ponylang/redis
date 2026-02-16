@@ -22,6 +22,7 @@ actor \nodoc\ Main is TestList
     test(_TestRespParserArray)
     test(_TestRespParserMultipleValues)
     test(_TestRespParserMalformedErrors)
+    test(_TestRespParserIntegerOverflow)
 
     // Serializer property tests
     test(Property1UnitTest[Array[ByteSeq] val](
