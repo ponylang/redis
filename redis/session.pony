@@ -9,8 +9,9 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
 
   Create a session with `ConnectInfo` and a `SessionStatusNotify` receiver.
   Once `redis_session_ready` fires, commands can be sent via `execute()`.
-  Command execution is serialized: only one command is in flight at a time.
-  Additional calls to `execute()` are queued and dispatched in order.
+  Commands are pipelined: each call to `execute()` sends the command
+  immediately without waiting for prior responses. Responses are matched
+  to receivers in FIFO order.
   """
   var state: _SessionState
   var _tcp_connection: lori.TCPConnection = lori.TCPConnection.none()
@@ -238,7 +239,7 @@ class ref _SessionConnected is (_ConnectedState & _NotReadyForCommands)
 
 class val _QueuedCommand
   """
-  A command waiting to be sent or awaiting its response.
+  A command awaiting its response from the server.
   """
   let command: Array[ByteSeq] val
   let receiver: ResultReceiver
@@ -251,15 +252,13 @@ class val _QueuedCommand
 
 class ref _SessionReady is _ConnectedState
   """
-  Session is ready to execute commands. Command execution is serialized:
-  only one command is in flight at a time. Additional calls to `execute()`
-  are queued and dispatched in order. Phase 3 (pipelining) will remove
-  the in-flight gate.
+  Session is ready to execute commands. Commands are pipelined: each call
+  to `execute()` sends the command immediately over the wire. Responses
+  are matched to receivers in FIFO order via the `_pending` queue.
   """
   let _notify: SessionStatusNotify
   let _readbuf: Reader
   let _pending: Array[_QueuedCommand] = _pending.create()
-  var _in_flight: Bool = false
 
   new ref create(notify': SessionStatusNotify) =>
     _notify = notify'
@@ -273,18 +272,12 @@ class ref _SessionReady is _ConnectedState
     receiver: ResultReceiver)
   =>
     _pending.push(_QueuedCommand(command, receiver))
-    if not _in_flight then
-      _send_next(s)
-    end
+    s._connection().send(_RespSerializer(command))
 
   fun ref on_response(s: Session ref, response: RespValue) =>
     try
       let queued = _pending.shift()?
-      _in_flight = false
       queued.receiver.redis_response(s, response)
-      if _pending.size() > 0 then
-        _send_next(s)
-      end
     else
       _Unreachable()
     end
@@ -315,15 +308,6 @@ class ref _SessionReady is _ConnectedState
 
   fun notify(): SessionStatusNotify =>
     _notify
-
-  fun ref _send_next(s: Session ref) =>
-    try
-      let queued = _pending(0)?
-      s._connection().send(_RespSerializer(queued.command))
-      _in_flight = true
-    else
-      _Unreachable()
-    end
 
   fun ref _drain_pending(s: Session ref) =>
     for queued in _pending.values() do
