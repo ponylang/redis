@@ -50,3 +50,4 @@ actor \nodoc\ Main is TestList
     test(_TestSessionPubSubPattern)
     test(_TestSessionExecuteWhileSubscribed)
     test(_TestSessionPubSubBackToReady)
+    test(_TestSessionPipelineDrain)

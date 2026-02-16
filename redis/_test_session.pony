@@ -914,3 +914,111 @@ actor \nodoc\ _PubSubBackToReadyClient is
   be redis_session_connection_failed(session: Session) =>
     _h.fail("Connection failed")
     _h.complete(false)
+
+// integration/Session/PipelineDrain
+
+class \nodoc\ iso _TestSessionPipelineDrain is UnitTest
+  fun name(): String =>
+    "integration/Session/PipelineDrain"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    let client = _PipelineDrainClient(h)
+    let session = Session(
+      ConnectInfo(auth, info.host, info.port),
+      client)
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _PipelineDrainClient is
+  (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
+  let _h: TestHelper
+  var _step: USize = 0
+  var _subscribed: Bool = false
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_ready(session: Session) =>
+    if _subscribed then
+      // Back to ready after unsubscribe — clean up test key.
+      let del_cmd: Array[ByteSeq] val = ["DEL"; "_test_pipeline_drain"]
+      session.execute(del_cmd, this)
+    else
+      // Pipeline commands, then subscribe before responses arrive.
+      let set_cmd: Array[ByteSeq] val =
+        ["SET"; "_test_pipeline_drain"; "drain_value"]
+      session.execute(set_cmd, this)
+      let get_cmd: Array[ByteSeq] val = ["GET"; "_test_pipeline_drain"]
+      session.execute(get_cmd, this)
+      let channels: Array[String] val = ["_test_pipeline_drain_ch"]
+      session.subscribe(channels, this)
+    end
+
+  be redis_response(session: Session, response: RespValue) =>
+    _step = _step + 1
+    match _step
+    | 1 =>
+      // SET response — drained from pending in subscribed mode.
+      match response
+      | let s: RespSimpleString =>
+        if s.value != "OK" then
+          _h.fail("SET: expected OK, got: " + s.value)
+          _h.complete(false)
+        end
+      else
+        _h.fail("SET: expected RespSimpleString")
+        _h.complete(false)
+      end
+    | 2 =>
+      // GET response — drained from pending in subscribed mode.
+      match response
+      | let b: RespBulkString =>
+        let value = String.from_array(b.value)
+        if value != "drain_value" then
+          _h.fail("GET: expected 'drain_value', got: '" + value + "'")
+          _h.complete(false)
+        end
+      else
+        _h.fail("GET: expected RespBulkString")
+        _h.complete(false)
+      end
+    | 3 =>
+      // DEL response — done.
+      _h.complete(true)
+    else
+      _h.fail("Unexpected response step: " + _step.string())
+      _h.complete(false)
+    end
+
+  be redis_subscribed(session: Session, channel: String,
+    count: USize)
+  =>
+    // Subscribe confirmation arrived after pending commands were drained.
+    if channel != "_test_pipeline_drain_ch" then
+      _h.fail("Expected channel '_test_pipeline_drain_ch', got: '"
+        + channel + "'")
+      _h.complete(false)
+      return
+    end
+    _subscribed = true
+    let channels: Array[String] val = ["_test_pipeline_drain_ch"]
+    session.unsubscribe(channels)
+
+  be redis_unsubscribed(session: Session, channel: String,
+    count: USize)
+  =>
+    // When count reaches 0, session transitions back to ready.
+    // redis_session_ready will fire and we clean up.
+    None
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    _h.fail("Command failed: " + failure.message())
+    _h.complete(false)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection failed")
+    _h.complete(false)
