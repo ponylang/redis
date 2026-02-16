@@ -9,6 +9,8 @@ class \nodoc\ val _RedisTestConfiguration
   let port: String
   let ssl_host: String
   let ssl_port: String
+  let resp2_host: String
+  let resp2_port: String
 
   new val create(vars: (Array[String] val | None)) =>
     let e = EnvVars(vars)
@@ -18,6 +20,8 @@ class \nodoc\ val _RedisTestConfiguration
     port = try e("REDIS_PORT")? else "6379" end
     ssl_host = try e("REDIS_SSL_HOST")? else host end
     ssl_port = try e("REDIS_SSL_PORT")? else "6380" end
+    resp2_host = try e("REDIS_RESP2_HOST")? else host end
+    resp2_port = try e("REDIS_RESP2_PORT")? else "6381" end
 
 // integration/Session/ConnectAndReady
 
@@ -1185,3 +1189,264 @@ actor \nodoc\ _SSLSetAndGetClient is (SessionStatusNotify & ResultReceiver)
   be redis_session_connection_failed(session: Session) =>
     _h.fail("SSL connection failed")
     _h.complete(false)
+
+// integration/Session/Resp3ConnectAndReady
+
+class \nodoc\ iso _TestSessionResp3ConnectAndReady is UnitTest
+  fun name(): String =>
+    "integration/Session/Resp3ConnectAndReady"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    let session = Session(
+      ConnectInfo(auth, info.host, info.port where protocol' = Resp3),
+      _Resp3ConnectAndReadyNotify(h))
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _Resp3ConnectAndReadyNotify is SessionStatusNotify
+  let _h: TestHelper
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_ready(session: Session) =>
+    _h.complete(true)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection failed")
+    _h.complete(false)
+
+// integration/Session/Resp3SetAndGet
+
+class \nodoc\ iso _TestSessionResp3SetAndGet is UnitTest
+  fun name(): String =>
+    "integration/Session/Resp3SetAndGet"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    let client = _Resp3SetAndGetClient(h)
+    let session = Session(
+      ConnectInfo(auth, info.host, info.port where protocol' = Resp3),
+      client)
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _Resp3SetAndGetClient is (SessionStatusNotify & ResultReceiver)
+  let _h: TestHelper
+  var _step: USize = 0
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_ready(session: Session) =>
+    let set_cmd: Array[ByteSeq] val =
+      ["SET"; "_test_resp3_set_and_get"; "hello_resp3"]
+    session.execute(set_cmd, this)
+
+  be redis_response(session: Session, response: RespValue) =>
+    _step = _step + 1
+    if _step == 1 then
+      // SET response
+      match response
+      | let s: RespSimpleString =>
+        if s.value != "OK" then
+          _h.fail("Expected OK from SET, got: " + s.value)
+          _h.complete(false)
+          return
+        end
+      else
+        _h.fail("Expected RespSimpleString from SET")
+        _h.complete(false)
+        return
+      end
+      let get_cmd: Array[ByteSeq] val =
+        ["GET"; "_test_resp3_set_and_get"]
+      session.execute(get_cmd, this)
+    elseif _step == 2 then
+      // GET response
+      match response
+      | let b: RespBulkString =>
+        let value = String.from_array(b.value)
+        if value != "hello_resp3" then
+          _h.fail("Expected 'hello_resp3', got: '" + value + "'")
+          _h.complete(false)
+          return
+        end
+      else
+        _h.fail("Expected RespBulkString from GET")
+        _h.complete(false)
+        return
+      end
+      let del_cmd: Array[ByteSeq] val =
+        ["DEL"; "_test_resp3_set_and_get"]
+      session.execute(del_cmd, this)
+    else
+      // DEL response — done
+      _h.complete(true)
+    end
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    _h.fail("Command failed: " + failure.message())
+    _h.complete(false)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection failed")
+    _h.complete(false)
+
+// integration/Session/Resp3FallbackToResp2
+
+class \nodoc\ iso _TestSessionResp3FallbackToResp2 is UnitTest
+  fun name(): String =>
+    "integration/Session/Resp3FallbackToResp2"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    let client = _Resp3FallbackClient(h)
+    let session = Session(
+      ConnectInfo(auth, info.resp2_host, info.resp2_port
+        where protocol' = Resp3),
+      client)
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _Resp3FallbackClient is (SessionStatusNotify & ResultReceiver)
+  let _h: TestHelper
+  var _step: USize = 0
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_ready(session: Session) =>
+    let set_cmd: Array[ByteSeq] val =
+      ["SET"; "_test_resp3_fallback"; "hello_fallback"]
+    session.execute(set_cmd, this)
+
+  be redis_response(session: Session, response: RespValue) =>
+    _step = _step + 1
+    if _step == 1 then
+      // SET response
+      match response
+      | let s: RespSimpleString =>
+        if s.value != "OK" then
+          _h.fail("Expected OK from SET, got: " + s.value)
+          _h.complete(false)
+          return
+        end
+      else
+        _h.fail("Expected RespSimpleString from SET")
+        _h.complete(false)
+        return
+      end
+      let get_cmd: Array[ByteSeq] val =
+        ["GET"; "_test_resp3_fallback"]
+      session.execute(get_cmd, this)
+    elseif _step == 2 then
+      // GET response
+      match response
+      | let b: RespBulkString =>
+        let value = String.from_array(b.value)
+        if value != "hello_fallback" then
+          _h.fail("Expected 'hello_fallback', got: '" + value + "'")
+          _h.complete(false)
+          return
+        end
+      else
+        _h.fail("Expected RespBulkString from GET")
+        _h.complete(false)
+        return
+      end
+      let del_cmd: Array[ByteSeq] val =
+        ["DEL"; "_test_resp3_fallback"]
+      session.execute(del_cmd, this)
+    else
+      // DEL response — done
+      _h.complete(true)
+    end
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    _h.fail("Command failed: " + failure.message())
+    _h.complete(false)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection to RESP2-only server failed")
+    _h.complete(false)
+
+// BuildHelloCommand
+
+class \nodoc\ iso _TestBuildHelloCommand is UnitTest
+  fun name(): String => "BuildHelloCommand"
+
+  fun apply(h: TestHelper) ? =>
+    let auth = lori.TCPConnectAuth(h.env.root)
+
+    // No password: ["HELLO"; "3"]
+    let no_pw = ConnectInfo(auth, "localhost" where protocol' = Resp3)
+    let cmd1 = _BuildHelloCommand(no_pw)
+    h.assert_eq[USize](2, cmd1.size())
+    _assert_byteseq(h, "HELLO", cmd1(0)?)
+    _assert_byteseq(h, "3", cmd1(1)?)
+
+    // Password, no username: ["HELLO"; "3"; "AUTH"; "default"; "secret"]
+    let pw_no_user = ConnectInfo(auth, "localhost"
+      where password' = "secret", protocol' = Resp3)
+    let cmd2 = _BuildHelloCommand(pw_no_user)
+    h.assert_eq[USize](5, cmd2.size())
+    _assert_byteseq(h, "HELLO", cmd2(0)?)
+    _assert_byteseq(h, "3", cmd2(1)?)
+    _assert_byteseq(h, "AUTH", cmd2(2)?)
+    _assert_byteseq(h, "default", cmd2(3)?)
+    _assert_byteseq(h, "secret", cmd2(4)?)
+
+    // Password + username: ["HELLO"; "3"; "AUTH"; "myuser"; "secret"]
+    let pw_user = ConnectInfo(auth, "localhost"
+      where password' = "secret", username' = "myuser", protocol' = Resp3)
+    let cmd3 = _BuildHelloCommand(pw_user)
+    h.assert_eq[USize](5, cmd3.size())
+    _assert_byteseq(h, "HELLO", cmd3(0)?)
+    _assert_byteseq(h, "3", cmd3(1)?)
+    _assert_byteseq(h, "AUTH", cmd3(2)?)
+    _assert_byteseq(h, "myuser", cmd3(3)?)
+    _assert_byteseq(h, "secret", cmd3(4)?)
+
+  fun _assert_byteseq(h: TestHelper, expected: String, actual: ByteSeq) =>
+    match actual
+    | let s: String val =>
+      h.assert_eq[String](expected, s)
+    | let a: Array[U8] val =>
+      h.assert_eq[String](expected, String.from_array(a))
+    end
+
+// BuildAuthCommand
+
+class \nodoc\ iso _TestBuildAuthCommand is UnitTest
+  fun name(): String => "BuildAuthCommand"
+
+  fun apply(h: TestHelper) ? =>
+    // No username: ["AUTH"; "secret"]
+    let cmd1 = _BuildAuthCommand(None, "secret")
+    h.assert_eq[USize](2, cmd1.size())
+    _assert_byteseq(h, "AUTH", cmd1(0)?)
+    _assert_byteseq(h, "secret", cmd1(1)?)
+
+    // With username: ["AUTH"; "myuser"; "secret"]
+    let cmd2 = _BuildAuthCommand("myuser", "secret")
+    h.assert_eq[USize](3, cmd2.size())
+    _assert_byteseq(h, "AUTH", cmd2(0)?)
+    _assert_byteseq(h, "myuser", cmd2(1)?)
+    _assert_byteseq(h, "secret", cmd2(2)?)
+
+  fun _assert_byteseq(h: TestHelper, expected: String, actual: ByteSeq) =>
+    match actual
+    | let s: String val =>
+      h.assert_eq[String](expected, s)
+    | let a: Array[U8] val =>
+      h.assert_eq[String](expected, String.from_array(a))
+    end

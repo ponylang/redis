@@ -8,11 +8,11 @@ use "pony_test"
 
 primitive _TestRespSerializer
   """
-  Serialize any RespValue into RESP2 wire format bytes. Unlike
+  Serialize any RespValue into RESP2/RESP3 wire format bytes. Unlike
   _RespSerializer (which only serializes commands as arrays of bulk strings),
   this handles all RESP value types for roundtrip testing.
 
-  RespNull serializes canonically as $-1\r\n.
+  RespNull serializes canonically as _\r\n.
   """
   fun apply(value: RespValue): Array[U8] val =>
     recover val
@@ -58,11 +58,74 @@ primitive _TestRespSerializer
         _serialize(buf, elem)
       end
     | RespNull =>
-      buf.push('$')
-      buf.push('-')
-      buf.push('1')
+      buf.push('_')
       buf.push('\r')
       buf.push('\n')
+    | let b: RespBoolean =>
+      buf.push('#')
+      buf.push(if b.value then 't' else 'f' end)
+      buf.push('\r')
+      buf.push('\n')
+    | let d: RespDouble =>
+      buf.push(',')
+      let d_s: String val = d.value.string()
+      for byte in d_s.values() do buf.push(byte) end
+      buf.push('\r')
+      buf.push('\n')
+    | let bn: RespBigNumber =>
+      buf.push('(')
+      for byte in bn.value.values() do buf.push(byte) end
+      buf.push('\r')
+      buf.push('\n')
+    | let be': RespBulkError =>
+      buf.push('!')
+      let len_s: String val = be'.message.size().string()
+      for byte in len_s.values() do buf.push(byte) end
+      buf.push('\r')
+      buf.push('\n')
+      for byte in be'.message.values() do buf.push(byte) end
+      buf.push('\r')
+      buf.push('\n')
+    | let vs: RespVerbatimString =>
+      let total = vs.encoding.size() + 1 + vs.value.size()
+      buf.push('=')
+      let len_s: String val = total.string()
+      for byte in len_s.values() do buf.push(byte) end
+      buf.push('\r')
+      buf.push('\n')
+      for byte in vs.encoding.values() do buf.push(byte) end
+      buf.push(':')
+      for byte in vs.value.values() do buf.push(byte) end
+      buf.push('\r')
+      buf.push('\n')
+    | let m: RespMap =>
+      buf.push('%')
+      let map_s: String val = m.pairs.size().string()
+      for byte in map_s.values() do buf.push(byte) end
+      buf.push('\r')
+      buf.push('\n')
+      for (k, v) in m.pairs.values() do
+        _serialize(buf, k)
+        _serialize(buf, v)
+      end
+    | let set: RespSet =>
+      buf.push('~')
+      let set_s: String val = set.values.size().string()
+      for byte in set_s.values() do buf.push(byte) end
+      buf.push('\r')
+      buf.push('\n')
+      for elem in set.values.values() do
+        _serialize(buf, elem)
+      end
+    | let p: RespPush =>
+      buf.push('>')
+      let push_s: String val = p.values.size().string()
+      for byte in push_s.values() do buf.push(byte) end
+      buf.push('\r')
+      buf.push('\n')
+      for elem in p.values.values() do
+        _serialize(buf, elem)
+      end
     end
 
 primitive _RespValueEq
@@ -97,6 +160,65 @@ primitive _RespValueEq
         false
       end
     | (RespNull, RespNull) => true
+    | (let a': RespBoolean, let b': RespBoolean) =>
+      a'.value == b'.value
+    | (let a': RespDouble, let b': RespDouble) =>
+      a'.value == b'.value
+    | (let a': RespBigNumber, let b': RespBigNumber) =>
+      a'.value == b'.value
+    | (let a': RespBulkError, let b': RespBulkError) =>
+      _byte_arrays_eq(a'.message, b'.message)
+    | (let a': RespVerbatimString, let b': RespVerbatimString) =>
+      (a'.encoding == b'.encoding) and _byte_arrays_eq(a'.value, b'.value)
+    | (let a': RespMap, let b': RespMap) =>
+      if a'.pairs.size() != b'.pairs.size() then
+        return false
+      end
+      try
+        var i: USize = 0
+        while i < a'.pairs.size() do
+          (let ak, let av) = a'.pairs(i)?
+          (let bk, let bv) = b'.pairs(i)?
+          if not apply(ak, bk) then return false end
+          if not apply(av, bv) then return false end
+          i = i + 1
+        end
+        true
+      else
+        false
+      end
+    | (let a': RespSet, let b': RespSet) =>
+      if a'.values.size() != b'.values.size() then
+        return false
+      end
+      try
+        var i: USize = 0
+        while i < a'.values.size() do
+          if not apply(a'.values(i)?, b'.values(i)?) then
+            return false
+          end
+          i = i + 1
+        end
+        true
+      else
+        false
+      end
+    | (let a': RespPush, let b': RespPush) =>
+      if a'.values.size() != b'.values.size() then
+        return false
+      end
+      try
+        var i: USize = 0
+        while i < a'.values.size() do
+          if not apply(a'.values(i)?, b'.values(i)?) then
+            return false
+          end
+          i = i + 1
+        end
+        true
+      else
+        false
+      end
     else
       false
     end
@@ -116,7 +238,7 @@ primitive _RespValueEq
 
 primitive _RespGens
   """
-  PonyCheck generators for RESP2 values. Used in property-based tests.
+  PonyCheck generators for RESP2/RESP3 values. Used in property-based tests.
   """
   fun simple_string(): Generator[RespSimpleString] =>
     """
@@ -172,10 +294,125 @@ primitive _RespGens
   fun null_value(): Generator[RespNull] =>
     Generators.unit[RespNull](RespNull)
 
+  fun boolean(): Generator[RespBoolean] =>
+    Generators.bool().map[RespBoolean]({(b) => RespBoolean(b) })
+
+  fun double(): Generator[RespDouble] =>
+    """
+    Generate doubles from integer values. F64.string() uses %g format which
+    doesn't preserve enough precision for arbitrary floats to roundtrip
+    through string serialization. Integer-valued doubles roundtrip exactly.
+    """
+    Generators.i64(-1_000_000, 1_000_000)
+      .map[RespDouble]({(i) => RespDouble(i.f64()) })
+
+  fun big_number(): Generator[RespBigNumber] =>
+    """
+    Generate big number strings from I64 values.
+    """
+    Generators.i64()
+      .map[RespBigNumber]({(i) => RespBigNumber(i.string()) })
+
+  fun bulk_error(): Generator[RespBulkError] =>
+    Generators.byte_string(Generators.u8(), 0, 100)
+      .map[RespBulkError]({(s) =>
+        RespBulkError(
+          recover val
+            let out = Array[U8](s.size())
+            for b in s.values() do out.push(b) end
+            out
+          end)
+      })
+
+  fun verbatim_string(): Generator[RespVerbatimString] =>
+    """
+    Generate verbatim strings with a 3-character encoding and arbitrary data.
+    """
+    Generators.byte_string(Generators.u8(), 0, 80)
+      .map[RespVerbatimString]({(s) =>
+        RespVerbatimString("txt",
+          recover val
+            let out = Array[U8](s.size())
+            for b in s.values() do out.push(b) end
+            out
+          end)
+      })
+
+  fun resp_map(max_depth: USize = 2): Generator[RespMap] =>
+    """
+    Generate maps with 0-3 key-value pairs using depth-limited values.
+    Uses twice the number of elements and pairs them up.
+    """
+    let elem_gen = value(max_depth)
+    Generators.usize(0, 3)
+      .flat_map[RespMap]({(count)(elem_gen) =>
+        if count == 0 then
+          Generators.unit[RespMap](
+            RespMap(recover val Array[(RespValue, RespValue)] end))
+        else
+          // Generate count*2 elements, pair them up as key-value pairs.
+          Generators.iso_seq_of[RespValue, Array[RespValue] iso](
+            elem_gen, count * 2, count * 2)
+            .map[RespMap]({(elems) =>
+              let arr: Array[RespValue] val = consume elems
+              let pairs = recover val
+                let p = Array[(RespValue, RespValue)](arr.size() / 2)
+                try
+                  var i: USize = 0
+                  while i < arr.size() do
+                    p.push((arr(i)?, arr(i + 1)?))
+                    i = i + 2
+                  end
+                end
+                p
+              end
+              RespMap(pairs)
+            })
+        end
+      })
+
+  fun resp_set(max_depth: USize = 2): Generator[RespSet] =>
+    """
+    Generate sets with 0-5 elements using depth-limited value generation.
+    """
+    let elem_gen = value(max_depth)
+    Generators.usize(0, 5)
+      .flat_map[RespSet]({(count)(elem_gen) =>
+        if count == 0 then
+          Generators.unit[RespSet](
+            RespSet(recover val Array[RespValue] end))
+        else
+          Generators.iso_seq_of[RespValue, Array[RespValue] iso](
+            elem_gen, count, count)
+            .map[RespSet]({(arr) =>
+              RespSet(consume arr)
+            })
+        end
+      })
+
+  fun push(max_depth: USize = 2): Generator[RespPush] =>
+    """
+    Generate push messages with 0-4 elements using depth-limited values.
+    """
+    let elem_gen = value(max_depth)
+    Generators.usize(0, 4)
+      .flat_map[RespPush]({(count)(elem_gen) =>
+        if count == 0 then
+          Generators.unit[RespPush](
+            RespPush(recover val Array[RespValue] end))
+        else
+          Generators.iso_seq_of[RespValue, Array[RespValue] iso](
+            elem_gen, count, count)
+            .map[RespPush]({(arr) =>
+              RespPush(consume arr)
+            })
+        end
+      })
+
   fun value(max_depth: USize = 2): Generator[RespValue] =>
     """
-    Generate any RespValue. Arrays are depth-limited to prevent unbounded
-    recursion.
+    Generate any RespValue. Recursive types (arrays, maps, sets, push) are
+    depth-limited to prevent unbounded recursion.
     """
     if max_depth == 0 then
       _leaf_value()
@@ -187,6 +424,14 @@ primitive _RespGens
         (2, resp_error().map[RespValue]({(e) => e }))
         (1, null_value().map[RespValue]({(n) => n }))
         (2, array(max_depth - 1).map[RespValue]({(a) => a }))
+        (2, boolean().map[RespValue]({(b) => b }))
+        (2, double().map[RespValue]({(d) => d }))
+        (1, big_number().map[RespValue]({(b) => b }))
+        (1, bulk_error().map[RespValue]({(b) => b }))
+        (1, verbatim_string().map[RespValue]({(v) => v }))
+        (2, resp_map(max_depth - 1).map[RespValue]({(m) => m }))
+        (2, resp_set(max_depth - 1).map[RespValue]({(s) => s }))
+        (1, push(max_depth - 1).map[RespValue]({(p) => p }))
       ])
     end
 
@@ -219,6 +464,11 @@ primitive _RespGens
       (3, integer().map[RespValue]({(i) => i }))
       (2, resp_error().map[RespValue]({(e) => e }))
       (1, null_value().map[RespValue]({(n) => n }))
+      (2, boolean().map[RespValue]({(b) => b }))
+      (2, double().map[RespValue]({(d) => d }))
+      (1, big_number().map[RespValue]({(b) => b }))
+      (1, bulk_error().map[RespValue]({(b) => b }))
+      (1, verbatim_string().map[RespValue]({(v) => v }))
     ])
 
   fun command(): Generator[Array[ByteSeq] val] =>

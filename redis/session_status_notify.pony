@@ -22,9 +22,10 @@ interface tag SessionStatusNotify
   be redis_session_ready(session: Session) =>
     """
     Called when the session is ready to accept commands. Fires after
-    successful AUTH when a password is configured, or immediately after
-    TCP connect when no password is set. Also fires when the session
-    exits pub/sub subscribed mode (subscription count reaches 0).
+    successful HELLO negotiation (RESP3), successful AUTH (RESP2 with
+    password), or immediately after TCP connect (RESP2, no password).
+    Also fires when the session exits pub/sub subscribed mode
+    (subscription count reaches 0).
     """
     None
 

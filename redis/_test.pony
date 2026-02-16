@@ -23,6 +23,15 @@ actor \nodoc\ Main is TestList
     test(_TestRespParserMultipleValues)
     test(_TestRespParserMalformedErrors)
     test(_TestRespParserIntegerOverflow)
+    test(_TestRespParserResp3Null)
+    test(_TestRespParserBoolean)
+    test(_TestRespParserDouble)
+    test(_TestRespParserBigNumber)
+    test(_TestRespParserBulkError)
+    test(_TestRespParserVerbatimString)
+    test(_TestRespParserMap)
+    test(_TestRespParserSet)
+    test(_TestRespParserPush)
 
     // Serializer property tests
     test(Property1UnitTest[Array[ByteSeq] val](
@@ -55,3 +64,10 @@ actor \nodoc\ Main is TestList
     test(_TestSessionSSLConnectionFailure)
     test(_TestSessionSSLConnectAndReady)
     test(_TestSessionSSLSetAndGet)
+    test(_TestSessionResp3ConnectAndReady)
+    test(_TestSessionResp3SetAndGet)
+    test(_TestSessionResp3FallbackToResp2)
+
+    // Command construction unit tests
+    test(_TestBuildHelloCommand)
+    test(_TestBuildAuthCommand)

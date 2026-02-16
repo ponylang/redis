@@ -16,6 +16,7 @@ primitive _ResponseHandler
   fun apply(s: Session ref, readbuf: Reader) =>
     while true do
       match _RespParser(readbuf)
+      | let push: RespPush => s.state.on_push(s, push)
       | let v: RespValue => s.state.on_response(s, v)
       | None => return
       | let _: RespMalformed =>
