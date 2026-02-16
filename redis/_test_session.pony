@@ -2,10 +2,13 @@ use "cli"
 use "collections"
 use lori = "lori"
 use "pony_test"
+use "ssl/net"
 
 class \nodoc\ val _RedisTestConfiguration
   let host: String
   let port: String
+  let ssl_host: String
+  let ssl_port: String
 
   new val create(vars: (Array[String] val | None)) =>
     let e = EnvVars(vars)
@@ -13,6 +16,8 @@ class \nodoc\ val _RedisTestConfiguration
       ifdef linux then "127.0.0.2" else "localhost" end
     end
     port = try e("REDIS_PORT")? else "6379" end
+    ssl_host = try e("REDIS_SSL_HOST")? else host end
+    ssl_port = try e("REDIS_SSL_PORT")? else "6380" end
 
 // integration/Session/ConnectAndReady
 
@@ -1021,4 +1026,162 @@ actor \nodoc\ _PipelineDrainClient is
 
   be redis_session_connection_failed(session: Session) =>
     _h.fail("Connection failed")
+    _h.complete(false)
+
+// integration/Session/SSLConnectionFailure
+
+class \nodoc\ iso _TestSessionSSLConnectionFailure is UnitTest
+  fun name(): String =>
+    "integration/Session/SSLConnectionFailure"
+
+  fun apply(h: TestHelper) =>
+    let auth = lori.TCPConnectAuth(h.env.root)
+    // Connect with SSL to a port with nothing listening. This exercises
+    // the SSL constructor path (Session calls ssl_client instead of
+    // client) and verifies connection failure is reported through the
+    // existing state machine. We don't connect to the Redis port because
+    // SSL-to-plaintext causes a deadlock: the ClientHello has no \r\n
+    // so Redis waits for more data, while SSL waits for a ServerHello.
+    let host = ifdef linux then "127.0.0.2" else "localhost" end
+    let sslctx: SSLContext val =
+      recover val SSLContext end
+    let session = Session(
+      ConnectInfo(auth, host, "59873" where
+        ssl_mode' = SSLRequired(sslctx)),
+      _SSLConnectionFailureNotify(h))
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _SSLConnectionFailureNotify is SessionStatusNotify
+  let _h: TestHelper
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.complete(true)
+
+  be redis_session_ready(session: Session) =>
+    _h.fail("Should not have connected — nothing listening on port")
+    _h.complete(false)
+
+// integration/Session/SSLConnectAndReady
+
+class \nodoc\ iso _TestSessionSSLConnectAndReady is UnitTest
+  fun name(): String =>
+    "integration/Session/SSLConnectAndReady"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    let sslctx: SSLContext val =
+      recover val
+        SSLContext
+          .> set_client_verify(false)
+          .> set_server_verify(false)
+      end
+    let session = Session(
+      ConnectInfo(auth, info.ssl_host, info.ssl_port where
+        ssl_mode' = SSLRequired(sslctx)),
+      _SSLConnectAndReadyNotify(h))
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _SSLConnectAndReadyNotify is SessionStatusNotify
+  let _h: TestHelper
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_ready(session: Session) =>
+    _h.complete(true)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("SSL connection failed")
+    _h.complete(false)
+
+// integration/Session/SSLSetAndGet
+
+class \nodoc\ iso _TestSessionSSLSetAndGet is UnitTest
+  fun name(): String =>
+    "integration/Session/SSLSetAndGet"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    let sslctx: SSLContext val =
+      recover val
+        SSLContext
+          .> set_client_verify(false)
+          .> set_server_verify(false)
+      end
+    let client = _SSLSetAndGetClient(h)
+    let session = Session(
+      ConnectInfo(auth, info.ssl_host, info.ssl_port where
+        ssl_mode' = SSLRequired(sslctx)),
+      client)
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _SSLSetAndGetClient is (SessionStatusNotify & ResultReceiver)
+  let _h: TestHelper
+  var _step: USize = 0
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_ready(session: Session) =>
+    let set_cmd: Array[ByteSeq] val =
+      ["SET"; "_test_ssl_set_and_get"; "hello_ssl"]
+    session.execute(set_cmd, this)
+
+  be redis_response(session: Session, response: RespValue) =>
+    _step = _step + 1
+    if _step == 1 then
+      // SET response — should be +OK
+      match response
+      | let s: RespSimpleString =>
+        if s.value != "OK" then
+          _h.fail("Expected OK from SET, got: " + s.value)
+          _h.complete(false)
+          return
+        end
+      else
+        _h.fail("Expected RespSimpleString from SET")
+        _h.complete(false)
+        return
+      end
+      let get_cmd: Array[ByteSeq] val = ["GET"; "_test_ssl_set_and_get"]
+      session.execute(get_cmd, this)
+    elseif _step == 2 then
+      // GET response — should be bulk string "hello_ssl"
+      match response
+      | let b: RespBulkString =>
+        let value = String.from_array(b.value)
+        if value != "hello_ssl" then
+          _h.fail("Expected 'hello_ssl', got: '" + value + "'")
+          _h.complete(false)
+          return
+        end
+      else
+        _h.fail("Expected RespBulkString from GET")
+        _h.complete(false)
+        return
+      end
+      // Clean up test key
+      let del_cmd: Array[ByteSeq] val = ["DEL"; "_test_ssl_set_and_get"]
+      session.execute(del_cmd, this)
+    else
+      // DEL response — done
+      _h.complete(true)
+    end
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    _h.fail("Command failed: " + failure.message())
+    _h.complete(false)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("SSL connection failed")
     _h.complete(false)

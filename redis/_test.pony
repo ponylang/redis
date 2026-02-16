@@ -52,3 +52,6 @@ actor \nodoc\ Main is TestList
     test(_TestSessionExecuteWhileSubscribed)
     test(_TestSessionPubSubBackToReady)
     test(_TestSessionPipelineDrain)
+    test(_TestSessionSSLConnectionFailure)
+    test(_TestSessionSSLConnectAndReady)
+    test(_TestSessionSSLSetAndGet)

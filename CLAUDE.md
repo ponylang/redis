@@ -7,8 +7,8 @@ make                    # build and run all tests (requires Redis running)
 make unit-tests         # run unit tests only (no Redis needed)
 make integration-tests  # run integration tests only (requires Redis)
 make build-examples     # build example programs
-make start-redis        # start Redis in Docker for local testing
-make stop-redis         # stop and remove Docker Redis
+make start-redis        # start plaintext + SSL Redis in Docker
+make stop-redis         # stop and remove both Redis containers
 make clean              # clean build artifacts
 ```
 
@@ -40,13 +40,20 @@ Package: `redis`
 ### Session Layer
 
 - `Session` (actor in `session.pony`): Main entry point. Manages connection lifecycle and pub/sub via a state machine. Implements `lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver`. All state machine classes (`_SessionUnopened`, `_SessionConnected`, `_SessionReady`, `_SessionSubscribed`, `_SessionClosed`) are in `session.pony`, following the postgres pattern.
-- `ConnectInfo` (in `connect_info.pony`): Connection configuration (host, port, optional password).
+- `ConnectInfo` (in `connect_info.pony`): Connection configuration (host, port, optional password, SSL mode).
 - `SessionStatusNotify` (in `session_status_notify.pony`): Lifecycle callback interface. All callbacks have default no-op implementations. Callbacks: `redis_session_connected`, `redis_session_connection_failed`, `redis_session_ready`, `redis_session_authentication_failed`, `redis_session_closed`.
 - `ResultReceiver` (in `result_receiver.pony`): Command response callback interface. Callbacks: `redis_response`, `redis_command_failed`.
 - `SubscriptionNotify` (in `subscription_notify.pony`): Pub/sub callback interface. All callbacks have default no-op implementations. Callbacks: `redis_subscribed`, `redis_unsubscribed`, `redis_message`, `redis_psubscribed`, `redis_punsubscribed`, `redis_pmessage`.
 - `ClientError` (in `client_error.pony`): Client-side error trait with `SessionNotReady`, `SessionClosed`, and `SessionInSubscribedMode` primitives.
 - `_ResponseHandler` (in `_response_handler.pony`): Loops `_RespParser` over a `buffered.Reader`, delivering parsed `RespValue`s to the current state. Shuts down on `RespMalformed`.
 - `_IllegalState` / `_Unreachable` (in `_mort.pony`): Primitives for detecting impossible states.
+
+### SSL/TLS
+
+- `SSLMode` (type alias in `ssl_mode.pony`): `(SSLDisabled | SSLRequired)`. Controls whether the session uses plaintext TCP or SSL/TLS.
+- `SSLDisabled` (primitive in `ssl_mode.pony`): Plaintext TCP connection (default).
+- `SSLRequired` (class val in `ssl_mode.pony`): Wraps an `SSLContext val` for direct TLS connections. Redis uses direct TLS (typically port 6380) rather than STARTTLS.
+- The `ssl/net` package is a transitive dependency via lori (no `corral.json` change needed). Adding `use "ssl/net"` in source files is sufficient.
 
 ### Trait Composition
 
@@ -80,13 +87,23 @@ In `_SessionSubscribed`, any pipelined commands that were in-flight when SUBSCRI
 - Unit tests: `--exclude=integration/` — no external dependencies
 - Integration tests: `--only=integration/` — require a running Redis server
 - Test names prefixed with `integration/` for filtering
-- `_RedisTestConfiguration` reads `REDIS_HOST` and `REDIS_PORT` from environment (defaults to `127.0.0.2`/`6379` on Linux for WSL2 compatibility)
+- `_RedisTestConfiguration` reads environment variables for both plaintext and SSL Redis:
+  - `REDIS_HOST` / `REDIS_PORT` — plaintext (defaults to `127.0.0.2`/`6379` on Linux)
+  - `REDIS_SSL_HOST` / `REDIS_SSL_PORT` — TLS (defaults to same host/`6380`)
+
+### SSL-to-Plaintext Deadlock
+
+Do not write tests that connect with SSL to a plaintext Redis server. The TLS ClientHello is binary data with no `\r\n`, so Redis's RESP parser buffers it waiting for a line terminator. Meanwhile the SSL client waits for a ServerHello. Neither side sends more data — both block indefinitely. To test the SSL constructor path, connect to a non-listening port instead (TCP connection refused is fast and deterministic).
 
 ### CI
 
-Both `pr.yml` and `breakage-against-ponyc-latest.yml` use the `shared-docker-ci-standard-builder-with-libressl-4.2.0` image (for ssl support) and a `redis:7` service container with health checks. Integration tests receive `REDIS_HOST=redis` and `REDIS_PORT=6379` as environment variables. All make targets pass `ssl=libressl`.
+Both `pr.yml` and `breakage-against-ponyc-latest.yml` use the `shared-docker-ci-standard-builder-with-libressl-4.2.0` image (for ssl support) and two Redis service containers: `redis` (plaintext) and `redis-ssl` (TLS via `ghcr.io/ponylang/redis-ci-redis-ssl:latest`). Integration tests receive `REDIS_HOST=redis`, `REDIS_PORT=6379`, `REDIS_SSL_HOST=redis-ssl`, and `REDIS_SSL_PORT=6379`. All make targets pass `ssl=libressl`.
+
+The `redis-ssl` CI image is built via `build-ci-image.yml` (manually triggered `workflow_dispatch`). Source: `.ci-dockerfiles/redis-ssl/Dockerfile`. Build locally with `.ci-dockerfiles/redis-ssl/build-and-push.bash`.
 
 ## File Layout
 
 - `redis/` — main package source
 - `examples/` — example programs
+- `assets/` — test certificates for SSL Redis container
+- `.ci-dockerfiles/` — Dockerfiles for CI service containers

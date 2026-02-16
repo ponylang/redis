@@ -24,13 +24,25 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
 
   new create(connect_info': ConnectInfo, notify': SessionStatusNotify) =>
     state = _SessionUnopened(notify', connect_info')
-    _tcp_connection = lori.TCPConnection.client(
-      connect_info'.auth,
-      connect_info'.host,
-      connect_info'.port,
-      "",
-      this,
-      this)
+    _tcp_connection = match connect_info'.ssl_mode
+    | SSLDisabled =>
+      lori.TCPConnection.client(
+        connect_info'.auth,
+        connect_info'.host,
+        connect_info'.port,
+        "",
+        this,
+        this)
+    | let ssl: SSLRequired =>
+      lori.TCPConnection.ssl_client(
+        connect_info'.auth,
+        ssl.ctx,
+        connect_info'.host,
+        connect_info'.port,
+        "",
+        this,
+        this)
+    end
 
   be execute(command: Array[ByteSeq] val, receiver: ResultReceiver) =>
     """
