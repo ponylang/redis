@@ -2,7 +2,9 @@ FROM redis:7
 
 LABEL org.opencontainers.image.source="https://github.com/ponylang/redis"
 
-RUN mkdir -p /tls && \
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /tls && \
     openssl req -new -x509 -days 3650 -nodes \
       -out /tls/redis.crt -keyout /tls/redis.key \
       -subj '/CN=localhost' && \
