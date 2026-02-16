@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl && \
     openssl req -new -x509 -days 3650 -nodes \
       -out /tls/redis.crt -keyout /tls/redis.key \
       -subj '/CN=localhost' && \
+    chown redis:redis /tls/redis.key && \
     chmod 600 /tls/redis.key
 
 CMD ["redis-server", "--tls-port", "6379", "--port", "0", \
