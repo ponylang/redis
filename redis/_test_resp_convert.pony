@@ -56,6 +56,12 @@ class \nodoc\ iso _TestRespConvertAsBytes is Property1[RespValue]
         h.assert_true(bytes is b.value)
       else h.fail("Expected Array[U8] for RespBulkString")
       end
+    | let v: RespVerbatimString =>
+      match result
+      | let bytes: Array[U8] val =>
+        h.assert_true(bytes is v.value)
+      else h.fail("Expected Array[U8] for RespVerbatimString")
+      end
     | RespNull =>
       match result
       | RespNull => None

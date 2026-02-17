@@ -28,10 +28,11 @@ primitive RespConvert
 
   fun as_bytes(value: RespValue): (Array[U8] val | RespNull | None) =>
     """
-    Extract raw bytes from a `RespBulkString`.
+    Extract raw bytes from a `RespBulkString` or `RespVerbatimString`.
     """
     match value
     | let b: RespBulkString => b.value
+    | let v: RespVerbatimString => v.value
     | RespNull => RespNull
     else
       None
