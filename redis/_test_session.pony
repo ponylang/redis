@@ -1379,6 +1379,74 @@ actor \nodoc\ _Resp3FallbackClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Connection to RESP2-only server failed")
     _h.complete(false)
 
+// integration/CommandApi/SetAndGet
+
+class \nodoc\ iso _TestCommandApiSetAndGet is UnitTest
+  fun name(): String =>
+    "integration/CommandApi/SetAndGet"
+
+  fun apply(h: TestHelper) =>
+    let info = _RedisTestConfiguration(h.env.vars)
+    let auth = lori.TCPConnectAuth(h.env.root)
+    let client = _CommandApiSetAndGetClient(h)
+    let session = Session(
+      ConnectInfo(auth, info.host, info.port),
+      client)
+    h.dispose_when_done(session)
+    h.long_test(5_000_000_000)
+
+actor \nodoc\ _CommandApiSetAndGetClient is
+  (SessionStatusNotify & ResultReceiver)
+  let _h: TestHelper
+  var _step: USize = 0
+
+  new create(h: TestHelper) =>
+    _h = h
+
+  be redis_session_ready(session: Session) =>
+    session.execute(RedisString.set("_test_cmd_api", "hello_api"), this)
+
+  be redis_response(session: Session, response: RespValue) =>
+    _step = _step + 1
+    if _step == 1 then
+      // SET response — verify with RespConvert.is_ok
+      if not RespConvert.is_ok(response) then
+        _h.fail("Expected OK from SET")
+        _h.complete(false)
+        return
+      end
+      session.execute(RedisString.get("_test_cmd_api"), this)
+    elseif _step == 2 then
+      // GET response — verify with RespConvert.as_string
+      match RespConvert.as_string(response)
+      | let value: String =>
+        if value != "hello_api" then
+          _h.fail("Expected 'hello_api', got: '" + value + "'")
+          _h.complete(false)
+          return
+        end
+      else
+        _h.fail("Expected string from GET")
+        _h.complete(false)
+        return
+      end
+      let del_keys: Array[String] val = ["_test_cmd_api"]
+      session.execute(RedisKey.del(del_keys), this)
+    else
+      // DEL response — done
+      _h.complete(true)
+    end
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    _h.fail("Command failed: " + failure.message())
+    _h.complete(false)
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection failed")
+    _h.complete(false)
+
 // BuildHelloCommand
 
 class \nodoc\ iso _TestBuildHelloCommand is UnitTest

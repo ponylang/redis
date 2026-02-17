@@ -5,7 +5,8 @@ Redis client for Pony.
 
 Create a `Session` with connection info and a notification receiver. The
 session connects asynchronously — wait for `redis_session_ready` before
-sending commands:
+sending commands. Use command builder primitives to construct commands and
+`RespConvert` to extract typed values from responses:
 
 ```pony
 actor MyApp is (SessionStatusNotify & ResultReceiver)
@@ -16,11 +17,17 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
     _session = Session(ConnectInfo(auth, "localhost"), this)
 
   be redis_session_ready(session: Session) =>
-    session.execute(["SET"; "key"; "value"], this)
+    session.execute(RedisString.set("key", "value"), this)
 
   be redis_response(session: Session, response: RespValue) =>
-    // handle response
-    None
+    if RespConvert.is_ok(response) then
+      session.execute(RedisString.get("key"), this)
+    else
+      match RespConvert.as_string(response)
+      | let value: String => // use value
+        None
+      end
+    end
 
   be redis_command_failed(session: Session,
     command: Array[ByteSeq] val, failure: ClientError)
@@ -37,8 +44,10 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
 * `SessionStatusNotify` — lifecycle callbacks (connected, ready, closed, etc.)
 * `ResultReceiver` — command result callbacks
 
-Commands are arrays of `ByteSeq` (e.g., `["GET", "mykey"]`). Responses are
-`RespValue` variants — including `RespError` for server-side errors.
+Commands are arrays of `ByteSeq`. Use the command builder primitives (see
+below) for common commands, or construct arrays directly for commands not
+yet covered. Responses are `RespValue` variants — including `RespError` for
+server-side errors.
 
 ## Pub/Sub
 
@@ -139,4 +148,53 @@ a Redis server. This is a union of:
 * `RespMap` — ordered key-value pairs
 * `RespSet` — unordered collections
 * `RespPush` — server-initiated out-of-band messages
+
+## Command Builders
+
+Six primitives provide type-safe command construction for common Redis
+operations, replacing raw `Array[ByteSeq] val` arrays:
+
+* `RedisServer` — PING, ECHO, DBSIZE, FLUSHDB
+* `RedisString` — GET, SET (with NX/EX variants), INCR, DECR, INCRBY,
+  DECRBY, MGET, MSET
+* `RedisKey` — DEL, EXISTS, EXPIRE, TTL, PERSIST, KEYS, RENAME, TYPE
+* `RedisHash` — HGET, HSET, HDEL, HGETALL, HEXISTS
+* `RedisList` — LPUSH, RPUSH, LPOP, RPOP, LLEN, LRANGE
+* `RedisSet` — SADD, SREM, SMEMBERS, SISMEMBER, SCARD
+
+Each method returns `Array[ByteSeq] val` ready to pass to `session.execute`:
+
+```pony
+session.execute(RedisString.set("key", "value"), this)
+session.execute(RedisKey.expire("key", 300), this)
+```
+
+For commands not covered by the builders, construct the array directly:
+`session.execute(["ZADD"; "myzset"; "1"; "member"], this)`.
+
+## Response Extraction
+
+`RespConvert` provides total functions for extracting typed values from
+`RespValue` responses. Each extractor returns a three-way result:
+
+* The extracted value when the response matches (e.g., `String` from
+  `as_string`)
+* `RespNull` when the response is null
+* `None` when the response is a non-matching type
+
+```pony
+// Check for OK
+if RespConvert.is_ok(response) then ... end
+
+// Extract a string (from simple string, bulk string, or verbatim string)
+match RespConvert.as_string(response)
+| let value: String => // use value
+| RespNull => // key did not exist
+end
+
+// Extract an error message (from RespError or RespBulkError)
+match RespConvert.as_error(response)
+| let msg: String => // handle error
+end
+```
 """
