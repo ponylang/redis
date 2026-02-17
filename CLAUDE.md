@@ -50,6 +50,23 @@ Package: `redis`
 - `_BuildHelloCommand` / `_BuildAuthCommand` (primitives in `session.pony`): Build HELLO 3 and AUTH commands for protocol negotiation and authentication.
 - `_IllegalState` / `_Unreachable` (in `_mort.pony`): Primitives for detecting impossible states.
 
+### Command Builders
+
+Six public primitives for constructing common Redis commands as `Array[ByteSeq] val`. Each method is a pure function.
+
+- `RedisServer` (in `redis_server.pony`): PING, ECHO, DBSIZE, FLUSHDB.
+- `RedisString` (in `redis_string.pony`): GET, SET (with NX/EX variants), INCR, DECR, INCRBY, DECRBY, MGET, MSET.
+- `RedisKey` (in `redis_key.pony`): DEL, EXISTS, EXPIRE, TTL, PERSIST, KEYS, RENAME, TYPE (as `type_of`).
+- `RedisHash` (in `redis_hash.pony`): HGET, HSET, HDEL, HGETALL, HEXISTS.
+- `RedisList` (in `redis_list.pony`): LPUSH, RPUSH, LPOP, RPOP, LLEN, LRANGE.
+- `RedisSet` (in `redis_set.pony`): SADD, SREM, SMEMBERS, SISMEMBER, SCARD.
+
+Fixed-argument commands use `recover val [as ByteSeq: ...] end`. Variadic commands use `recover val` with `Array.push` loops.
+
+### Response Extraction
+
+- `RespConvert` (primitive in `resp_convert.pony`): Total functions for extracting typed values from `RespValue`. Each extractor returns `(T | RespNull | None)` except `as_error` → `(String | None)` and `is_ok` → `Bool`. Methods: `as_string`, `as_bytes`, `as_integer`, `as_bool`, `as_array`, `as_double`, `as_big_number`, `as_map`, `as_set`, `as_error`, `is_ok`.
+
 ### SSL/TLS
 
 - `SSLMode` (type alias in `ssl_mode.pony`): `(SSLDisabled | SSLRequired)`. Controls whether the session uses plaintext TCP or SSL/TLS.

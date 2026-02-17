@@ -22,16 +22,18 @@ actor Client is (SessionStatusNotify & ResultReceiver)
 
   be redis_session_ready(session: Session) =>
     _out.print("Connected and ready.")
-    let cmd: Array[ByteSeq] val = ["SET"; "hello"; "world"]
-    session.execute(cmd, this)
+    session.execute(RedisString.set("hello", "world"), this)
 
   be redis_session_connection_failed(session: Session) =>
     _out.print("Failed to connect.")
 
   be redis_response(session: Session, response: RespValue) =>
-    match response
-    | let s: RespSimpleString => _out.print("Response: " + s.value)
-    | let e: RespError => _out.print("Error: " + e.message)
+    if RespConvert.is_ok(response) then
+      _out.print("Response: OK")
+    else
+      match RespConvert.as_error(response)
+      | let msg: String => _out.print("Error: " + msg)
+      end
     end
     _session.close()
 

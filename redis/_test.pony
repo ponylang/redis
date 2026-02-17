@@ -71,3 +71,49 @@ actor \nodoc\ Main is TestList
     // Command construction unit tests
     test(_TestBuildHelloCommand)
     test(_TestBuildAuthCommand)
+
+    // RespConvert property tests
+    test(Property1UnitTest[RespValue](_TestRespConvertAsString))
+    test(Property1UnitTest[RespValue](_TestRespConvertAsBytes))
+    test(Property1UnitTest[RespValue](_TestRespConvertAsInteger))
+    test(Property1UnitTest[RespValue](_TestRespConvertAsBool))
+    test(Property1UnitTest[RespValue](_TestRespConvertAsArray))
+    test(Property1UnitTest[RespValue](_TestRespConvertAsDouble))
+    test(Property1UnitTest[RespValue](_TestRespConvertAsBigNumber))
+    test(Property1UnitTest[RespValue](_TestRespConvertAsMap))
+    test(Property1UnitTest[RespValue](_TestRespConvertAsSet))
+    test(Property1UnitTest[RespValue](_TestRespConvertAsError))
+    test(Property1UnitTest[RespValue](_TestRespConvertIsOk))
+
+    // RespConvert example tests
+    test(_TestRespConvertIsOkExamples)
+    test(_TestRespConvertAsErrorBulkExample)
+
+    // Command builder property tests
+    test(Property1UnitTest[Array[String] val](_TestRedisKeyDelProperty))
+    test(Property1UnitTest[Array[String] val](_TestRedisKeyExistsProperty))
+    test(Property1UnitTest[Array[String] val](
+      _TestRedisStringMgetProperty))
+    test(Property1UnitTest[(String, Array[String] val)](
+      _TestRedisListLpushProperty))
+    test(Property1UnitTest[(String, Array[String] val)](
+      _TestRedisListRpushProperty))
+    test(Property1UnitTest[(String, Array[String] val)](
+      _TestRedisSetSaddProperty))
+    test(Property1UnitTest[(String, Array[String] val)](
+      _TestRedisSetSremProperty))
+    test(Property1UnitTest[(String, Array[String] val)](
+      _TestRedisHashHdelProperty))
+    test(Property1UnitTest[Array[(String, String)] val](
+      _TestRedisStringMsetProperty))
+
+    // Command builder example tests
+    test(_TestRedisServerExamples)
+    test(_TestRedisStringExamples)
+    test(_TestRedisKeyExamples)
+    test(_TestRedisHashExamples)
+    test(_TestRedisListExamples)
+    test(_TestRedisSetExamples)
+
+    // Command API integration test
+    test(_TestCommandApiSetAndGet)
