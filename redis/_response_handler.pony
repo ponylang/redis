@@ -20,7 +20,7 @@ primitive _ResponseHandler
       | let v: RespValue => s.state.on_response(s, v)
       | None => return
       | let _: RespMalformed =>
-        s.state.shutdown(s)
+        s.state.shutdown(s, SessionProtocolError)
         return
       end
     end
