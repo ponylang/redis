@@ -14,7 +14,10 @@ interface tag ResultReceiver
   be redis_command_failed(session: Session,
     command: Array[ByteSeq] val, failure: ClientError)
     """
-    Called when a command could not be sent to the server. The command
-    and the client-side error are provided so the caller knows which
+    Called when a command failed due to a client-side error. This covers
+    both commands that could not be sent (e.g., session not ready or
+    closed) and in-flight commands whose responses will never arrive
+    (e.g., connection lost or protocol error). The original command and
+    the specific `ClientError` are provided so the caller knows which
     command failed and why.
     """
