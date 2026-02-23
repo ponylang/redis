@@ -296,15 +296,28 @@ class ref _SessionUnopened is
     match _connect_info.protocol
     | Resp3 =>
       let cmd = _BuildHelloCommand(_connect_info)
-      s.state = _SessionNegotiating(_notify, _connect_info)
-      s._connection().send(_RespSerializer(cmd))
+      let data = _RespSerializer(cmd)
+      match s._connection().send(data)
+      | let _: lori.SendToken =>
+        s.state = _SessionNegotiating(_notify, _connect_info)
+      else
+        s._connection().close()
+        s.state = _SessionClosed
+        _notify.redis_session_closed(s)
+      end
     | Resp2 =>
       match _connect_info.password
       | let password: String =>
-        let st = _SessionConnected(_notify)
-        s.state = st
         let cmd = _BuildAuthCommand(_connect_info.username, password)
-        s._connection().send(_RespSerializer(cmd))
+        let data = _RespSerializer(cmd)
+        match s._connection().send(data)
+        | let _: lori.SendToken =>
+          s.state = _SessionConnected(_notify)
+        else
+          s._connection().close()
+          s.state = _SessionClosed
+          _notify.redis_session_closed(s)
+        end
       | None =>
         s.state = _SessionReady(_notify)
         _notify.redis_session_ready(s)
@@ -362,8 +375,13 @@ class ref _SessionNegotiating is
       match _connect_info.password
       | let password: String =>
         let cmd = _BuildAuthCommand(_connect_info.username, password)
-        s.state = _SessionConnected.from_negotiating(_notify, _readbuf)
-        s._connection().send(_RespSerializer(cmd))
+        let data = _RespSerializer(cmd)
+        match s._connection().send(data)
+        | let _: lori.SendToken =>
+          s.state = _SessionConnected.from_negotiating(_notify, _readbuf)
+        else
+          shutdown(s, SessionConnectionLost)
+        end
       | None =>
         s.state = _SessionReady.from_connected(_notify, _readbuf)
         _notify.redis_session_ready(s)
@@ -399,8 +417,9 @@ class ref _SessionConnected is
   TCP connected, AUTH command sent, waiting for the server's response.
 
   AUTH is sent from `_SessionUnopened.on_connected` (or from
-  `_SessionNegotiating.on_response` during HELLO fallback) after
-  transitioning to this state.
+  `_SessionNegotiating.on_response` during HELLO fallback) before
+  transitioning to this state — the transition only happens on
+  successful send.
   """
   let _notify: SessionStatusNotify
   let _readbuf: Reader
