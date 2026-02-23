@@ -29,6 +29,8 @@ class \nodoc\ iso _TestSessionConnectAndReady is UnitTest
   fun name(): String =>
     "integration/Session/ConnectAndReady"
 
+  fun exclusion_group(): String => "integration"
+
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
@@ -40,22 +42,32 @@ class \nodoc\ iso _TestSessionConnectAndReady is UnitTest
 
 actor \nodoc\ _ConnectAndReadyNotify is SessionStatusNotify
   let _h: TestHelper
+  var _done: Bool = false
 
   new create(h: TestHelper) =>
     _h = h
 
   be redis_session_ready(session: Session) =>
+    _done = true
     _h.complete(true)
 
   be redis_session_connection_failed(session: Session) =>
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/SetAndGet
 
 class \nodoc\ iso _TestSessionSetAndGet is UnitTest
   fun name(): String =>
     "integration/Session/SetAndGet"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -69,6 +81,7 @@ class \nodoc\ iso _TestSessionSetAndGet is UnitTest
 
 actor \nodoc\ _SetAndGetClient is (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _step: USize = 0
 
   new create(h: TestHelper) =>
@@ -117,6 +130,7 @@ actor \nodoc\ _SetAndGetClient is (SessionStatusNotify & ResultReceiver)
       session.execute(del_cmd, this)
     else
       // DEL response — done
+      _done = true
       _h.complete(true)
     end
 
@@ -130,11 +144,19 @@ actor \nodoc\ _SetAndGetClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/ConnectionFailure
 
 class \nodoc\ iso _TestSessionConnectionFailure is UnitTest
   fun name(): String =>
     "integration/Session/ConnectionFailure"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let auth = lori.TCPConnectAuth(h.env.root)
@@ -148,22 +170,32 @@ class \nodoc\ iso _TestSessionConnectionFailure is UnitTest
 
 actor \nodoc\ _ConnectionFailureNotify is SessionStatusNotify
   let _h: TestHelper
+  var _done: Bool = false
 
   new create(h: TestHelper) =>
     _h = h
 
   be redis_session_connection_failed(session: Session) =>
+    _done = true
     _h.complete(true)
 
   be redis_session_ready(session: Session) =>
     _h.fail("Should not have connected")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/ExecuteBeforeReady
 
 class \nodoc\ iso _TestSessionExecuteBeforeReady is UnitTest
   fun name(): String =>
     "integration/Session/ExecuteBeforeReady"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -181,6 +213,7 @@ class \nodoc\ iso _TestSessionExecuteBeforeReady is UnitTest
 actor \nodoc\ _ExecuteBeforeReadyClient is
   (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
 
   new create(h: TestHelper) =>
     _h = h
@@ -190,6 +223,7 @@ actor \nodoc\ _ExecuteBeforeReadyClient is
   =>
     match failure
     | SessionNotReady =>
+      _done = true
       _h.complete(true)
     else
       _h.fail("Expected SessionNotReady, got: " + failure.message())
@@ -200,11 +234,19 @@ actor \nodoc\ _ExecuteBeforeReadyClient is
     _h.fail("Should not have received a response")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/ExecuteAfterClose
 
 class \nodoc\ iso _TestSessionExecuteAfterClose is UnitTest
   fun name(): String =>
     "integration/Session/ExecuteAfterClose"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -253,6 +295,8 @@ class \nodoc\ iso _TestSessionMultipleCommands is UnitTest
   fun name(): String =>
     "integration/Session/MultipleCommands"
 
+  fun exclusion_group(): String => "integration"
+
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
@@ -266,6 +310,7 @@ class \nodoc\ iso _TestSessionMultipleCommands is UnitTest
 actor \nodoc\ _MultipleCommandsClient is
   (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _step: USize = 0
 
   new create(h: TestHelper) =>
@@ -322,6 +367,7 @@ actor \nodoc\ _MultipleCommandsClient is
         _h.complete(false)
         return
       end
+      _done = true
       _h.complete(true)
     else
       _h.fail("Unexpected response step: " + _step.string())
@@ -338,11 +384,19 @@ actor \nodoc\ _MultipleCommandsClient is
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/Pipeline
 
 class \nodoc\ iso _TestSessionPipeline is UnitTest
   fun name(): String =>
     "integration/Session/Pipeline"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -356,6 +410,7 @@ class \nodoc\ iso _TestSessionPipeline is UnitTest
 
 actor \nodoc\ _PipelineClient is (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _step: USize = 0
 
   new create(h: TestHelper) =>
@@ -415,6 +470,7 @@ actor \nodoc\ _PipelineClient is (SessionStatusNotify & ResultReceiver)
       end
     elseif _step == 15 then
       // All DEL responses received — done.
+      _done = true
       _h.complete(true)
     end
 
@@ -428,11 +484,19 @@ actor \nodoc\ _PipelineClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/PipelineMixedResponses
 
 class \nodoc\ iso _TestSessionPipelineMixedResponses is UnitTest
   fun name(): String =>
     "integration/Session/PipelineMixedResponses"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -446,6 +510,7 @@ class \nodoc\ iso _TestSessionPipelineMixedResponses is UnitTest
 
 actor \nodoc\ _PipelineMixedClient is (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _step: USize = 0
 
   new create(h: TestHelper) =>
@@ -505,6 +570,7 @@ actor \nodoc\ _PipelineMixedClient is (SessionStatusNotify & ResultReceiver)
       session.execute(del_cmd, this)
     | 4 =>
       // DEL response — done.
+      _done = true
       _h.complete(true)
     else
       _h.fail("Unexpected response step: " + _step.string())
@@ -521,11 +587,19 @@ actor \nodoc\ _PipelineMixedClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/PipelineClose
 
 class \nodoc\ iso _TestSessionPipelineClose is UnitTest
   fun name(): String =>
     "integration/Session/PipelineClose"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -583,6 +657,8 @@ class \nodoc\ iso _TestSessionServerError is UnitTest
   fun name(): String =>
     "integration/Session/ServerError"
 
+  fun exclusion_group(): String => "integration"
+
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
@@ -595,6 +671,7 @@ class \nodoc\ iso _TestSessionServerError is UnitTest
 
 actor \nodoc\ _ServerErrorClient is (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
 
   new create(h: TestHelper) =>
     _h = h
@@ -607,6 +684,7 @@ actor \nodoc\ _ServerErrorClient is (SessionStatusNotify & ResultReceiver)
   be redis_response(session: Session, response: RespValue) =>
     match response
     | let e: RespError =>
+      _done = true
       _h.complete(true)
     else
       _h.fail("Expected RespError from invalid command")
@@ -623,11 +701,19 @@ actor \nodoc\ _ServerErrorClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/PubSub
 
 class \nodoc\ iso _TestSessionPubSub is UnitTest
   fun name(): String =>
     "integration/Session/PubSub"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -638,6 +724,7 @@ class \nodoc\ iso _TestSessionPubSub is UnitTest
 actor \nodoc\ _PubSubClient is
   (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   let _subscriber: Session
   let _publisher: Session
   var _ready_count: USize = 0
@@ -685,6 +772,7 @@ actor \nodoc\ _PubSubClient is
     count: USize)
   =>
     if count == 0 then
+      _done = true
       _h.complete(true)
     end
 
@@ -702,11 +790,19 @@ actor \nodoc\ _PubSubClient is
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/PubSubPattern
 
 class \nodoc\ iso _TestSessionPubSubPattern is UnitTest
   fun name(): String =>
     "integration/Session/PubSubPattern"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -717,6 +813,7 @@ class \nodoc\ iso _TestSessionPubSubPattern is UnitTest
 actor \nodoc\ _PubSubPatternClient is
   (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   let _subscriber: Session
   let _publisher: Session
   var _ready_count: USize = 0
@@ -772,6 +869,7 @@ actor \nodoc\ _PubSubPatternClient is
     count: USize)
   =>
     if count == 0 then
+      _done = true
       _h.complete(true)
     end
 
@@ -789,11 +887,19 @@ actor \nodoc\ _PubSubPatternClient is
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/ExecuteWhileSubscribed
 
 class \nodoc\ iso _TestSessionExecuteWhileSubscribed is UnitTest
   fun name(): String =>
     "integration/Session/ExecuteWhileSubscribed"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -808,6 +914,7 @@ class \nodoc\ iso _TestSessionExecuteWhileSubscribed is UnitTest
 actor \nodoc\ _ExecuteWhileSubscribedClient is
   (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
 
   new create(h: TestHelper) =>
     _h = h
@@ -840,6 +947,7 @@ actor \nodoc\ _ExecuteWhileSubscribedClient is
     count: USize)
   =>
     if count == 0 then
+      _done = true
       _h.complete(true)
     end
 
@@ -851,11 +959,19 @@ actor \nodoc\ _ExecuteWhileSubscribedClient is
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/PubSubBackToReady
 
 class \nodoc\ iso _TestSessionPubSubBackToReady is UnitTest
   fun name(): String =>
     "integration/Session/PubSubBackToReady"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -870,6 +986,7 @@ class \nodoc\ iso _TestSessionPubSubBackToReady is UnitTest
 actor \nodoc\ _PubSubBackToReadyClient is
   (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _was_subscribed: Bool = false
 
   new create(h: TestHelper) =>
@@ -904,6 +1021,7 @@ actor \nodoc\ _PubSubBackToReadyClient is
     match response
     | let s: RespSimpleString =>
       if s.value == "PONG" then
+        _done = true
         _h.complete(true)
       else
         _h.fail("Expected PONG, got: " + s.value)
@@ -924,11 +1042,19 @@ actor \nodoc\ _PubSubBackToReadyClient is
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/PipelineDrain
 
 class \nodoc\ iso _TestSessionPipelineDrain is UnitTest
   fun name(): String =>
     "integration/Session/PipelineDrain"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -943,6 +1069,7 @@ class \nodoc\ iso _TestSessionPipelineDrain is UnitTest
 actor \nodoc\ _PipelineDrainClient is
   (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _step: USize = 0
   var _subscribed: Bool = false
 
@@ -995,6 +1122,7 @@ actor \nodoc\ _PipelineDrainClient is
       end
     | 3 =>
       // DEL response — done.
+      _done = true
       _h.complete(true)
     else
       _h.fail("Unexpected response step: " + _step.string())
@@ -1032,11 +1160,19 @@ actor \nodoc\ _PipelineDrainClient is
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/SSLConnectionFailure
 
 class \nodoc\ iso _TestSessionSSLConnectionFailure is UnitTest
   fun name(): String =>
     "integration/Session/SSLConnectionFailure"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let auth = lori.TCPConnectAuth(h.env.root)
@@ -1058,22 +1194,32 @@ class \nodoc\ iso _TestSessionSSLConnectionFailure is UnitTest
 
 actor \nodoc\ _SSLConnectionFailureNotify is SessionStatusNotify
   let _h: TestHelper
+  var _done: Bool = false
 
   new create(h: TestHelper) =>
     _h = h
 
   be redis_session_connection_failed(session: Session) =>
+    _done = true
     _h.complete(true)
 
   be redis_session_ready(session: Session) =>
     _h.fail("Should not have connected — nothing listening on port")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/SSLConnectAndReady
 
 class \nodoc\ iso _TestSessionSSLConnectAndReady is UnitTest
   fun name(): String =>
     "integration/Session/SSLConnectAndReady"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -1093,22 +1239,32 @@ class \nodoc\ iso _TestSessionSSLConnectAndReady is UnitTest
 
 actor \nodoc\ _SSLConnectAndReadyNotify is SessionStatusNotify
   let _h: TestHelper
+  var _done: Bool = false
 
   new create(h: TestHelper) =>
     _h = h
 
   be redis_session_ready(session: Session) =>
+    _done = true
     _h.complete(true)
 
   be redis_session_connection_failed(session: Session) =>
     _h.fail("SSL connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/SSLSetAndGet
 
 class \nodoc\ iso _TestSessionSSLSetAndGet is UnitTest
   fun name(): String =>
     "integration/Session/SSLSetAndGet"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -1129,6 +1285,7 @@ class \nodoc\ iso _TestSessionSSLSetAndGet is UnitTest
 
 actor \nodoc\ _SSLSetAndGetClient is (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _step: USize = 0
 
   new create(h: TestHelper) =>
@@ -1177,6 +1334,7 @@ actor \nodoc\ _SSLSetAndGetClient is (SessionStatusNotify & ResultReceiver)
       session.execute(del_cmd, this)
     else
       // DEL response — done
+      _done = true
       _h.complete(true)
     end
 
@@ -1190,11 +1348,19 @@ actor \nodoc\ _SSLSetAndGetClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("SSL connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/Resp3ConnectAndReady
 
 class \nodoc\ iso _TestSessionResp3ConnectAndReady is UnitTest
   fun name(): String =>
     "integration/Session/Resp3ConnectAndReady"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -1207,22 +1373,32 @@ class \nodoc\ iso _TestSessionResp3ConnectAndReady is UnitTest
 
 actor \nodoc\ _Resp3ConnectAndReadyNotify is SessionStatusNotify
   let _h: TestHelper
+  var _done: Bool = false
 
   new create(h: TestHelper) =>
     _h = h
 
   be redis_session_ready(session: Session) =>
+    _done = true
     _h.complete(true)
 
   be redis_session_connection_failed(session: Session) =>
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/Resp3SetAndGet
 
 class \nodoc\ iso _TestSessionResp3SetAndGet is UnitTest
   fun name(): String =>
     "integration/Session/Resp3SetAndGet"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -1236,6 +1412,7 @@ class \nodoc\ iso _TestSessionResp3SetAndGet is UnitTest
 
 actor \nodoc\ _Resp3SetAndGetClient is (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _step: USize = 0
 
   new create(h: TestHelper) =>
@@ -1285,6 +1462,7 @@ actor \nodoc\ _Resp3SetAndGetClient is (SessionStatusNotify & ResultReceiver)
       session.execute(del_cmd, this)
     else
       // DEL response — done
+      _done = true
       _h.complete(true)
     end
 
@@ -1298,11 +1476,19 @@ actor \nodoc\ _Resp3SetAndGetClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Connection failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/Session/Resp3FallbackToResp2
 
 class \nodoc\ iso _TestSessionResp3FallbackToResp2 is UnitTest
   fun name(): String =>
     "integration/Session/Resp3FallbackToResp2"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -1317,6 +1503,7 @@ class \nodoc\ iso _TestSessionResp3FallbackToResp2 is UnitTest
 
 actor \nodoc\ _Resp3FallbackClient is (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _step: USize = 0
 
   new create(h: TestHelper) =>
@@ -1366,6 +1553,7 @@ actor \nodoc\ _Resp3FallbackClient is (SessionStatusNotify & ResultReceiver)
       session.execute(del_cmd, this)
     else
       // DEL response — done
+      _done = true
       _h.complete(true)
     end
 
@@ -1379,11 +1567,19 @@ actor \nodoc\ _Resp3FallbackClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Connection to RESP2-only server failed")
     _h.complete(false)
 
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
+
 // integration/CommandApi/SetAndGet
 
 class \nodoc\ iso _TestCommandApiSetAndGet is UnitTest
   fun name(): String =>
     "integration/CommandApi/SetAndGet"
+
+  fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
@@ -1398,6 +1594,7 @@ class \nodoc\ iso _TestCommandApiSetAndGet is UnitTest
 actor \nodoc\ _CommandApiSetAndGetClient is
   (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
+  var _done: Bool = false
   var _step: USize = 0
 
   new create(h: TestHelper) =>
@@ -1434,6 +1631,7 @@ actor \nodoc\ _CommandApiSetAndGetClient is
       session.execute(RedisKey.del(del_keys), this)
     else
       // DEL response — done
+      _done = true
       _h.complete(true)
     end
 
@@ -1446,6 +1644,12 @@ actor \nodoc\ _CommandApiSetAndGetClient is
   be redis_session_connection_failed(session: Session) =>
     _h.fail("Connection failed")
     _h.complete(false)
+
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed unexpectedly")
+      _h.complete(false)
+    end
 
 // BuildHelloCommand
 
