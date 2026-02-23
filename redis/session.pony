@@ -519,8 +519,19 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
         _BufferedSend(_RespSerializer(command),
           _QueuedCommand(command, receiver)))
     else
-      _pending.push(_QueuedCommand(command, receiver))
-      s._connection().send(_RespSerializer(command))
+      let data = _RespSerializer(command)
+      match s._connection().send(data)
+      | let _: lori.SendToken =>
+        _pending.push(_QueuedCommand(command, receiver))
+      | lori.SendErrorNotWriteable =>
+        _throttled = true
+        _send_buffer.push(
+          _BufferedSend(data, _QueuedCommand(command, receiver)))
+        _notify.redis_session_throttled(s)
+      | lori.SendErrorNotConnected =>
+        receiver.redis_command_failed(s, command, SessionConnectionLost)
+        shutdown(s)
+      end
     end
 
   fun ref on_response(s: Session ref, response: RespValue) =>
@@ -606,7 +617,17 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
-      s._connection().send(_RespSerializer(cmd))
+      let data = _RespSerializer(cmd)
+      match s._connection().send(data)
+      | let _: lori.SendToken => None
+      | lori.SendErrorNotWriteable =>
+        _throttled = true
+        _send_buffer.push(_BufferedSend(data))
+        _notify.redis_session_throttled(s)
+      | lori.SendErrorNotConnected =>
+        shutdown(s)
+        return
+      end
     end
     s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify,
       _throttled, _send_buffer)
@@ -624,7 +645,17 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
-      s._connection().send(_RespSerializer(cmd))
+      let data = _RespSerializer(cmd)
+      match s._connection().send(data)
+      | let _: lori.SendToken => None
+      | lori.SendErrorNotWriteable =>
+        _throttled = true
+        _send_buffer.push(_BufferedSend(data))
+        _notify.redis_session_throttled(s)
+      | lori.SendErrorNotConnected =>
+        shutdown(s)
+        return
+      end
     end
     s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify,
       _throttled, _send_buffer)
@@ -801,7 +832,16 @@ class ref _SessionSubscribed is _ConnectedState
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
-      s._connection().send(_RespSerializer(cmd))
+      let data = _RespSerializer(cmd)
+      match s._connection().send(data)
+      | let _: lori.SendToken => None
+      | lori.SendErrorNotWriteable =>
+        _throttled = true
+        _send_buffer.push(_BufferedSend(data))
+        _notify.redis_session_throttled(s)
+      | lori.SendErrorNotConnected =>
+        shutdown(s)
+      end
     end
 
   fun ref psubscribe(s: Session ref, patterns: Array[String] val,
@@ -819,7 +859,16 @@ class ref _SessionSubscribed is _ConnectedState
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
-      s._connection().send(_RespSerializer(cmd))
+      let data = _RespSerializer(cmd)
+      match s._connection().send(data)
+      | let _: lori.SendToken => None
+      | lori.SendErrorNotWriteable =>
+        _throttled = true
+        _send_buffer.push(_BufferedSend(data))
+        _notify.redis_session_throttled(s)
+      | lori.SendErrorNotConnected =>
+        shutdown(s)
+      end
     end
 
   fun ref unsubscribe(s: Session ref, channels: Array[String] val) =>
@@ -832,7 +881,16 @@ class ref _SessionSubscribed is _ConnectedState
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
-      s._connection().send(_RespSerializer(cmd))
+      let data = _RespSerializer(cmd)
+      match s._connection().send(data)
+      | let _: lori.SendToken => None
+      | lori.SendErrorNotWriteable =>
+        _throttled = true
+        _send_buffer.push(_BufferedSend(data))
+        _notify.redis_session_throttled(s)
+      | lori.SendErrorNotConnected =>
+        shutdown(s)
+      end
     end
 
   fun ref punsubscribe(s: Session ref, patterns: Array[String] val) =>
@@ -845,7 +903,16 @@ class ref _SessionSubscribed is _ConnectedState
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
-      s._connection().send(_RespSerializer(cmd))
+      let data = _RespSerializer(cmd)
+      match s._connection().send(data)
+      | let _: lori.SendToken => None
+      | lori.SendErrorNotWriteable =>
+        _throttled = true
+        _send_buffer.push(_BufferedSend(data))
+        _notify.redis_session_throttled(s)
+      | lori.SendErrorNotConnected =>
+        shutdown(s)
+      end
     end
 
   fun ref on_throttled(s: Session ref) =>

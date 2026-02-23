@@ -26,9 +26,11 @@ primitive SessionClosed is ClientError
 
 primitive SessionConnectionLost is ClientError
   """
-  Error returned when the connection to the Redis server was lost
-  unexpectedly. In-flight commands that were awaiting responses receive
-  this error via `redis_command_failed`.
+  Error returned when a command could not be completed because the
+  connection to the Redis server was lost. This covers commands that
+  could not be sent (the connection was already lost when `execute()`
+  was called) and in-flight commands that were awaiting responses when
+  the connection dropped.
   """
   fun message(): String => "Connection to Redis server was lost"
 
