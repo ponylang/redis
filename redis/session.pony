@@ -153,7 +153,7 @@ interface _SessionState
   fun ref execute(s: Session ref, command: Array[ByteSeq] val,
     receiver: ResultReceiver)
   fun ref close(s: Session ref)
-  fun ref shutdown(s: Session ref)
+  fun ref shutdown(s: Session ref, reason: ClientError)
   fun ref subscribe(s: Session ref, channels: Array[String] val,
     sub_notify: SubscriptionNotify)
   fun ref unsubscribe(s: Session ref, channels: Array[String] val)
@@ -196,7 +196,7 @@ trait _ClosedState is _SessionState
   fun ref close(s: Session ref) =>
     None
 
-  fun ref shutdown(s: Session ref) =>
+  fun ref shutdown(s: Session ref, reason: ClientError) =>
     ifdef debug then
       _IllegalState()
     end
@@ -330,7 +330,7 @@ class ref _SessionUnopened is
   fun ref close(s: Session ref) =>
     s._connection().close()
 
-  fun ref shutdown(s: Session ref) =>
+  fun ref shutdown(s: Session ref, reason: ClientError) =>
     s._connection().close()
 
 class ref _SessionNegotiating is
@@ -370,7 +370,7 @@ class ref _SessionNegotiating is
       end
     else
       // Unexpected HELLO response — protocol violation.
-      shutdown(s)
+      shutdown(s, SessionProtocolError)
     end
 
   fun ref on_closed(s: Session ref) =>
@@ -381,7 +381,7 @@ class ref _SessionNegotiating is
   fun ref close(s: Session ref) =>
     s._connection().close()
 
-  fun ref shutdown(s: Session ref) =>
+  fun ref shutdown(s: Session ref, reason: ClientError) =>
     _readbuf.clear()
     s._connection().close()
     s.state = _SessionClosed
@@ -420,10 +420,10 @@ class ref _SessionConnected is
       _notify.redis_session_ready(s)
     | let err: RespError =>
       _notify.redis_session_authentication_failed(s, err.message)
-      shutdown(s)
+      shutdown(s, SessionProtocolError)
     else
       // Unexpected AUTH response — protocol violation.
-      shutdown(s)
+      shutdown(s, SessionProtocolError)
     end
 
   fun ref on_closed(s: Session ref) =>
@@ -434,7 +434,7 @@ class ref _SessionConnected is
   fun ref close(s: Session ref) =>
     s._connection().close()
 
-  fun ref shutdown(s: Session ref) =>
+  fun ref shutdown(s: Session ref, reason: ClientError) =>
     _readbuf.clear()
     s._connection().close()
     s.state = _SessionClosed
@@ -530,7 +530,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
         _notify.redis_session_throttled(s)
       | lori.SendErrorNotConnected =>
         receiver.redis_command_failed(s, command, SessionConnectionLost)
-        shutdown(s)
+        shutdown(s, SessionConnectionLost)
       end
     end
 
@@ -558,10 +558,10 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
 
-  fun ref shutdown(s: Session ref) =>
+  fun ref shutdown(s: Session ref, reason: ClientError) =>
     _readbuf.clear()
-    _drain_send_buffer(s, SessionProtocolError)
-    _drain_pending(s, SessionProtocolError)
+    _drain_send_buffer(s, reason)
+    _drain_pending(s, reason)
     s._connection().close()
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
@@ -590,7 +590,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
           return
         | lori.SendErrorNotConnected =>
           _send_buffer.unshift(buffered)
-          shutdown(s)
+          shutdown(s, SessionConnectionLost)
           return
         end
       else
@@ -625,7 +625,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
         _send_buffer.push(_BufferedSend(data))
         _notify.redis_session_throttled(s)
       | lori.SendErrorNotConnected =>
-        shutdown(s)
+        shutdown(s, SessionConnectionLost)
         return
       end
     end
@@ -653,7 +653,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
         _send_buffer.push(_BufferedSend(data))
         _notify.redis_session_throttled(s)
       | lori.SendErrorNotConnected =>
-        shutdown(s)
+        shutdown(s, SessionConnectionLost)
         return
       end
     end
@@ -735,7 +735,7 @@ class ref _SessionSubscribed is _ConnectedState
     match response
     | let arr: RespArray => _dispatch_pubsub_values(s, arr.values)
     else
-      shutdown(s)
+      shutdown(s, SessionProtocolError)
     end
 
   fun ref _dispatch_pubsub_values(s: Session ref,
@@ -751,7 +751,7 @@ class ref _SessionSubscribed is _ConnectedState
             _sub_notify.redis_subscribed(s, String.from_array(ch.value),
               cnt.value.usize())
           else
-            shutdown(s)
+            shutdown(s, SessionProtocolError)
           end
         elseif msg_type == "unsubscribe" then
           match (values(1)?, values(2)?)
@@ -765,7 +765,7 @@ class ref _SessionSubscribed is _ConnectedState
               _notify.redis_session_ready(s)
             end
           else
-            shutdown(s)
+            shutdown(s, SessionProtocolError)
           end
         elseif msg_type == "message" then
           match (values(1)?, values(2)?)
@@ -773,7 +773,7 @@ class ref _SessionSubscribed is _ConnectedState
             _sub_notify.redis_message(s, String.from_array(ch.value),
               data_bs.value)
           else
-            shutdown(s)
+            shutdown(s, SessionProtocolError)
           end
         elseif msg_type == "psubscribe" then
           match (values(1)?, values(2)?)
@@ -781,7 +781,7 @@ class ref _SessionSubscribed is _ConnectedState
             _sub_notify.redis_psubscribed(s, String.from_array(pat.value),
               cnt.value.usize())
           else
-            shutdown(s)
+            shutdown(s, SessionProtocolError)
           end
         elseif msg_type == "punsubscribe" then
           match (values(1)?, values(2)?)
@@ -795,7 +795,7 @@ class ref _SessionSubscribed is _ConnectedState
               _notify.redis_session_ready(s)
             end
           else
-            shutdown(s)
+            shutdown(s, SessionProtocolError)
           end
         elseif msg_type == "pmessage" then
           match (values(1)?, values(2)?, values(3)?)
@@ -805,16 +805,16 @@ class ref _SessionSubscribed is _ConnectedState
             _sub_notify.redis_pmessage(s, String.from_array(pat.value),
               String.from_array(ch.value), data_bs.value)
           else
-            shutdown(s)
+            shutdown(s, SessionProtocolError)
           end
         else
-          shutdown(s)
+          shutdown(s, SessionProtocolError)
         end
       else
-        shutdown(s)
+        shutdown(s, SessionProtocolError)
       end
     else
-      shutdown(s)
+      shutdown(s, SessionProtocolError)
     end
 
   fun ref subscribe(s: Session ref, channels: Array[String] val,
@@ -840,7 +840,7 @@ class ref _SessionSubscribed is _ConnectedState
         _send_buffer.push(_BufferedSend(data))
         _notify.redis_session_throttled(s)
       | lori.SendErrorNotConnected =>
-        shutdown(s)
+        shutdown(s, SessionConnectionLost)
       end
     end
 
@@ -867,7 +867,7 @@ class ref _SessionSubscribed is _ConnectedState
         _send_buffer.push(_BufferedSend(data))
         _notify.redis_session_throttled(s)
       | lori.SendErrorNotConnected =>
-        shutdown(s)
+        shutdown(s, SessionConnectionLost)
       end
     end
 
@@ -889,7 +889,7 @@ class ref _SessionSubscribed is _ConnectedState
         _send_buffer.push(_BufferedSend(data))
         _notify.redis_session_throttled(s)
       | lori.SendErrorNotConnected =>
-        shutdown(s)
+        shutdown(s, SessionConnectionLost)
       end
     end
 
@@ -911,7 +911,7 @@ class ref _SessionSubscribed is _ConnectedState
         _send_buffer.push(_BufferedSend(data))
         _notify.redis_session_throttled(s)
       | lori.SendErrorNotConnected =>
-        shutdown(s)
+        shutdown(s, SessionConnectionLost)
       end
     end
 
@@ -939,7 +939,7 @@ class ref _SessionSubscribed is _ConnectedState
           return
         | lori.SendErrorNotConnected =>
           _send_buffer.unshift(buffered)
-          shutdown(s)
+          shutdown(s, SessionConnectionLost)
           return
         end
       else
@@ -963,10 +963,10 @@ class ref _SessionSubscribed is _ConnectedState
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
 
-  fun ref shutdown(s: Session ref) =>
+  fun ref shutdown(s: Session ref, reason: ClientError) =>
     _readbuf.clear()
-    _drain_send_buffer(s, SessionProtocolError)
-    _drain_pending(s, SessionProtocolError)
+    _drain_send_buffer(s, reason)
+    _drain_pending(s, reason)
     s._connection().close()
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
