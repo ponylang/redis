@@ -1663,6 +1663,136 @@ actor \nodoc\ _CommandApiSetAndGetClient is
       _h.complete(false)
     end
 
+// Session/BackpressureOverflow
+//
+// Uses a fake Redis server (lori listener + muted connection) to
+// deterministically trigger TCP backpressure. The server accepts a connection
+// then mutes itself so it never reads data. With RESP2 and no password the
+// session goes straight to _SessionReady without needing a server response.
+// The client sends a burst of commands with send_buffer_limit = 1, so the
+// second buffered command triggers SessionBackpressureOverflow.
+
+class \nodoc\ iso _TestSessionBackpressureOverflow is UnitTest
+  fun name(): String =>
+    "Session/BackpressureOverflow"
+
+  fun apply(h: TestHelper) =>
+    let host = ifdef linux then "127.0.0.2" else "localhost" end
+    let port = "16379"
+    let auth = h.env.root
+    let listener = _MutedServerListener(h, auth, host, port)
+    h.dispose_when_done(listener)
+    h.long_test(30_000_000_000)
+
+actor \nodoc\ _MutedServerListener is lori.TCPListenerActor
+  let _h: TestHelper
+  let _auth: AmbientAuth
+  let _host: String
+  let _port: String
+  var _tcp_listener: lori.TCPListener = lori.TCPListener.none()
+  let _connections: Array[_MutedServerConnection] = Array[_MutedServerConnection]
+
+  new create(h: TestHelper, auth: AmbientAuth, host: String, port: String) =>
+    _h = h
+    _auth = auth
+    _host = host
+    _port = port
+    _tcp_listener = lori.TCPListener(lori.TCPListenAuth(auth), host, port,
+      this)
+
+  fun ref _listener(): lori.TCPListener => _tcp_listener
+
+  fun ref _on_accept(fd: U32): lori.TCPConnectionActor =>
+    let conn = _MutedServerConnection(lori.TCPServerAuth(_auth), fd)
+    _connections.push(conn)
+    conn
+
+  fun ref _on_listening() =>
+    let connect_auth = lori.TCPConnectAuth(_auth)
+    let client = _BackpressureOverflowClient(_h, this)
+    let session = Session(
+      ConnectInfo(connect_auth, _host, _port
+        where send_buffer_limit' = 1),
+      client)
+    _h.dispose_when_done(session)
+
+  fun ref _on_listen_failure() =>
+    _h.fail("Fake server failed to listen")
+    _h.complete(false)
+
+  fun ref _on_closed() =>
+    for conn in _connections.values() do
+      conn.dispose()
+    end
+
+actor \nodoc\ _MutedServerConnection is
+  (lori.TCPConnectionActor & lori.ServerLifecycleEventReceiver)
+  var _tcp_connection: lori.TCPConnection = lori.TCPConnection.none()
+
+  new create(auth: lori.TCPServerAuth, fd: U32) =>
+    _tcp_connection = lori.TCPConnection.server(auth, fd, this, this)
+
+  fun ref _connection(): lori.TCPConnection => _tcp_connection
+
+  fun ref _on_started() =>
+    _connection().mute()
+
+actor \nodoc\ _BackpressureOverflowClient is
+  (SessionStatusNotify & ResultReceiver)
+  let _h: TestHelper
+  let _listener: _MutedServerListener
+  var _overflow_count: USize = 0
+  var _done: Bool = false
+
+  new create(h: TestHelper, listener: _MutedServerListener) =>
+    _h = h
+    _listener = listener
+
+  be redis_session_ready(session: Session) =>
+    // Send a burst of large commands to fill the TCP send buffer.
+    // With send_buffer_limit = 1, the second buffered command will overflow.
+    let payload = recover val String.from_array(
+      recover val Array[U8].init('x', 65536) end) end
+    var i: USize = 0
+    while i < 1000 do
+      session.execute(
+        recover val [as ByteSeq: "SET"; "key"; payload] end, this)
+      i = i + 1
+    end
+
+  be redis_response(session: Session, response: RespValue) =>
+    // The muted server never sends responses, so this shouldn't fire.
+    // If it does, ignore — we're only checking for overflow.
+    None
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    match failure
+    | SessionBackpressureOverflow =>
+      if _overflow_count == 0 then
+        // First overflow confirms the feature works.
+        _overflow_count = _overflow_count + 1
+        _done = true
+        _h.complete(true)
+      else
+        _overflow_count = _overflow_count + 1
+      end
+    else
+      _h.fail("Unexpected failure: " + failure.message())
+      _h.complete(false)
+    end
+
+  be redis_session_connection_failed(session: Session) =>
+    _h.fail("Connection to fake server failed")
+    _h.complete(false)
+
+  be redis_session_closed(session: Session) =>
+    if not _done then
+      _h.fail("Session closed before overflow triggered")
+      _h.complete(false)
+    end
+
 // BuildHelloCommand
 
 class \nodoc\ iso _TestBuildHelloCommand is UnitTest

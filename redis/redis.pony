@@ -39,7 +39,7 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
 ## Session API
 
 * `ConnectInfo` — connection configuration (host, port, optional password,
-  SSL mode, protocol version, optional username)
+  SSL mode, protocol version, optional username, send buffer limit)
 * `Session` — the main entry point; manages connection lifecycle
 * `SessionStatusNotify` — lifecycle callbacks (connected, ready, closed, etc.)
 * `ResultReceiver` — command result callbacks
@@ -109,10 +109,13 @@ negotiation.
 ## Backpressure
 
 When the TCP connection's send buffer fills (the OS socket buffer is full),
-commands are buffered internally and flushed automatically when the
-connection becomes writeable. The `redis_session_throttled` and
-`redis_session_unthrottled` callbacks on `SessionStatusNotify` inform the
-application of backpressure state changes:
+commands are buffered internally up to `send_buffer_limit` commands
+(default 1024, configurable via `ConnectInfo`). The buffer is flushed
+automatically when the connection becomes writeable.
+
+If the buffer is full when `execute()` is called, the command is rejected
+immediately via `redis_command_failed` with `SessionBackpressureOverflow`.
+This prevents unbounded memory growth when a producer outpaces the network:
 
 ```pony
 actor MyApp is (SessionStatusNotify & ResultReceiver)
@@ -126,11 +129,22 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
   be redis_session_unthrottled(session: Session) =>
     // Backpressure released — buffered commands are being flushed.
     None
+
+  be redis_command_failed(session: Session,
+    command: Array[ByteSeq] val, failure: ClientError)
+  =>
+    match failure
+    | SessionBackpressureOverflow =>
+      // Buffer full — stop sending until unthrottled.
+      None
+    end
 ```
 
-No action is required from the application — buffering and flushing happen
-transparently. The callbacks are informational, allowing applications to
-adapt their sending rate if desired.
+To increase the buffer limit for bursty workloads:
+
+```pony
+let info = ConnectInfo(auth, host where send_buffer_limit' = 4096)
+```
 
 ## RESP3
 

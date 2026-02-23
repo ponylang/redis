@@ -16,16 +16,18 @@ actor Client is (SessionStatusNotify & ResultReceiver)
   let _total: USize = 1000
   var _sent: USize = 0
   var _received: USize = 0
+  var _rejected: USize = 0
 
   new create(auth: lori.TCPConnectAuth, info: ServerInfo, out: OutStream) =>
     _out = out
+    // Use a small buffer limit so that overflow is likely during the burst.
     _session = Session(
-      ConnectInfo(auth, info.host, info.port),
+      ConnectInfo(auth, info.host, info.port where send_buffer_limit' = 100),
       this)
 
   be redis_session_ready(session: Session) =>
     _out.print("Connected and ready. Sending " + _total.string()
-      + " SET commands...")
+      + " SET commands (buffer limit 100)...")
     _send_burst(session)
 
   be redis_session_throttled(session: Session) =>
@@ -44,16 +46,27 @@ actor Client is (SessionStatusNotify & ResultReceiver)
     | let msg: String =>
       _out.print("Error on response " + _received.string() + ": " + msg)
     end
-    if _received == _total then
-      _out.print("All " + _total.string() + " responses received.")
+    if (_received + _rejected) == _total then
+      _out.print("Done. Received: " + _received.string()
+        + ", rejected (overflow): " + _rejected.string())
       _session.close()
     end
 
   be redis_command_failed(session: Session,
     command: Array[ByteSeq] val, failure: ClientError)
   =>
-    _out.print("Command failed: " + failure.message())
-    _session.close()
+    match failure
+    | SessionBackpressureOverflow =>
+      _rejected = _rejected + 1
+      if (_received + _rejected) == _total then
+        _out.print("Done. Received: " + _received.string()
+          + ", rejected (overflow): " + _rejected.string())
+        _session.close()
+      end
+    else
+      _out.print("Command failed: " + failure.message())
+      _session.close()
+    end
 
   fun ref _send_burst(session: Session) =>
     while _sent < _total do

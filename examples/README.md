@@ -16,7 +16,7 @@ Pub/sub messaging using two sessions. One session subscribes to `demo-channel`, 
 
 ## backpressure
 
-TCP backpressure handling. Sends 1000 SET commands in a burst to exercise backpressure, implements `redis_session_throttled` and `redis_session_unthrottled` to observe when the TCP send buffer fills and drains. Shows that commands sent during backpressure are buffered internally and flushed automatically — no application-side retry logic is needed.
+TCP backpressure handling with bounded buffer overflow. Sends 1000 SET commands in a burst with `send_buffer_limit' = 100` to trigger overflow. Implements `redis_session_throttled` and `redis_session_unthrottled` to observe backpressure state changes, and handles `SessionBackpressureOverflow` in `redis_command_failed` to count rejected commands. Shows how the bounded send buffer prevents unbounded memory growth and how applications can detect and handle overflow.
 
 ## ssl
 
