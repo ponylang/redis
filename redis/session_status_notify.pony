@@ -38,6 +38,23 @@ interface tag SessionStatusNotify
     """
     None
 
+  be redis_session_throttled(session: Session) =>
+    """
+    Called when the session starts experiencing TCP backpressure. Commands
+    sent via `execute()` are buffered internally and will be flushed
+    automatically when backpressure is released. No action is required
+    from the application unless it wants to reduce its sending rate.
+    """
+    None
+
+  be redis_session_unthrottled(session: Session) =>
+    """
+    Called when TCP backpressure is released. Buffered commands are being
+    flushed to the server. The application can resume sending at its
+    normal rate.
+    """
+    None
+
   be redis_session_closed(session: Session) =>
     """
     Called when the session has closed, whether by user request, server

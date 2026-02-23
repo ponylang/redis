@@ -13,6 +13,13 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
   immediately without waiting for prior responses. Responses are matched
   to receivers in FIFO order.
 
+  When the TCP connection's send buffer fills, the session automatically
+  buffers commands internally and flushes them when the connection becomes
+  writeable. The `redis_session_throttled` and `redis_session_unthrottled`
+  callbacks on `SessionStatusNotify` inform the application of
+  backpressure state changes. No action is required — buffering is
+  transparent.
+
   To enter pub/sub mode, call `subscribe()` or `psubscribe()` with a
   `SubscriptionNotify` receiver. While subscribed, `execute()` is rejected
   with `SessionInSubscribedMode`. When all subscriptions are cancelled
@@ -55,9 +62,10 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
   be close() =>
     """
     Close the session. Sends a QUIT command to the server before closing
-    the TCP connection. In-flight commands in the pending queue receive
-    `SessionClosed` via `redis_command_failed`. Commands sent after the
-    session is closed also receive `SessionClosed`.
+    the TCP connection. Buffered commands (queued during backpressure)
+    and in-flight commands in the pending queue receive `SessionClosed`
+    via `redis_command_failed`. Commands sent after the session is
+    closed also receive `SessionClosed`.
     """
     state.close(this)
 
@@ -116,6 +124,20 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
   fun ref _on_closed() =>
     state.on_closed(this)
 
+  fun ref _on_throttled() =>
+    state.on_throttled(this)
+
+  fun ref _on_unthrottled() =>
+    state.on_unthrottled(this)
+
+  be _flush_backpressure() =>
+    """
+    Deferred flush of the backpressure send buffer. Triggered by
+    on_unthrottled to avoid calling send() from within lori's pending
+    writes processing.
+    """
+    state.flush_send_buffer(this)
+
   fun ref _connection(): lori.TCPConnection =>
     _tcp_connection
 
@@ -138,6 +160,9 @@ interface _SessionState
   fun ref psubscribe(s: Session ref, patterns: Array[String] val,
     sub_notify: SubscriptionNotify)
   fun ref punsubscribe(s: Session ref, patterns: Array[String] val)
+  fun ref on_throttled(s: Session ref)
+  fun ref on_unthrottled(s: Session ref)
+  fun ref flush_send_buffer(s: Session ref)
 
 // Trait composition
 
@@ -241,9 +266,21 @@ trait _NotSubscribed is _SessionState
   fun ref punsubscribe(s: Session ref, patterns: Array[String] val) =>
     None
 
+trait _NotThrottleable is _SessionState
+  """
+  Mixin for states where backpressure events are no-ops. States that don't
+  send user commands (pre-ready states, closed state) ignore throttle and
+  unthrottle — lori manages partial writes internally during negotiation,
+  and no application commands are pending in those states.
+  """
+  fun ref on_throttled(s: Session ref) => None
+  fun ref on_unthrottled(s: Session ref) => None
+  fun ref flush_send_buffer(s: Session ref) => None
+
 // Session states
 
-class ref _SessionUnopened is (_NotReadyForCommands & _NotSubscribed)
+class ref _SessionUnopened is
+  (_NotReadyForCommands & _NotSubscribed & _NotThrottleable)
   """
   Initial state — waiting for TCP connection to be established.
   """
@@ -297,7 +334,7 @@ class ref _SessionUnopened is (_NotReadyForCommands & _NotSubscribed)
     s._connection().close()
 
 class ref _SessionNegotiating is
-  (_ConnectedState & _NotReadyForCommands & _NotSubscribed)
+  (_ConnectedState & _NotReadyForCommands & _NotSubscribed & _NotThrottleable)
   """
   TCP connected, HELLO command sent, waiting for the server's response.
   If the server supports RESP3, the response is a map with server info
@@ -357,7 +394,7 @@ class ref _SessionNegotiating is
     _notify
 
 class ref _SessionConnected is
-  (_ConnectedState & _NotReadyForCommands & _NotSubscribed)
+  (_ConnectedState & _NotReadyForCommands & _NotSubscribed & _NotThrottleable)
   """
   TCP connected, AUTH command sent, waiting for the server's response.
 
@@ -422,29 +459,69 @@ class val _QueuedCommand
     command = command'
     receiver = receiver'
 
+class val _BufferedSend
+  """
+  A serialized command buffered during backpressure. Holds wire-format
+  bytes ready to send, and optionally a queued command for response
+  matching. User commands from `execute()` have a `_QueuedCommand`;
+  internal commands (SUBSCRIBE, UNSUBSCRIBE, etc.) do not.
+  """
+  let data: Array[U8] val
+  let queued: (_QueuedCommand | None)
+
+  new val create(data': Array[U8] val,
+    queued': (_QueuedCommand | None) = None)
+  =>
+    data = data'
+    queued = queued'
+
 class ref _SessionReady is (_ConnectedState & _NotSubscribed)
   """
   Session is ready to execute commands. Commands are pipelined: each call
   to `execute()` sends the command immediately over the wire. Responses
   are matched to receivers in FIFO order via the `_pending` queue.
+
+  When TCP backpressure is active (`_throttled`), commands are serialized
+  and buffered in `_send_buffer` instead of being sent immediately. The
+  buffer is flushed when backpressure is released.
   """
   let _notify: SessionStatusNotify
   let _readbuf: Reader
   let _pending: Array[_QueuedCommand] = _pending.create()
+  var _throttled: Bool
+  let _send_buffer: Array[_BufferedSend]
 
   new ref create(notify': SessionStatusNotify) =>
     _notify = notify'
     _readbuf = Reader
+    _throttled = false
+    _send_buffer = Array[_BufferedSend]
 
   new ref from_connected(notify': SessionStatusNotify, readbuf': Reader) =>
     _notify = notify'
     _readbuf = readbuf'
+    _throttled = false
+    _send_buffer = Array[_BufferedSend]
+
+  new ref from_subscribed(notify': SessionStatusNotify, readbuf': Reader,
+    throttled': Bool, send_buffer': Array[_BufferedSend])
+  =>
+    _notify = notify'
+    _readbuf = readbuf'
+    _throttled = throttled'
+    _send_buffer = send_buffer'
 
   fun ref execute(s: Session ref, command: Array[ByteSeq] val,
     receiver: ResultReceiver)
   =>
-    _pending.push(_QueuedCommand(command, receiver))
-    s._connection().send(_RespSerializer(command))
+    if _throttled then
+      _send_buffer.push(
+        _BufferedSend(_RespSerializer(command),
+          _QueuedCommand(command, receiver)))
+    else
+      _pending.push(_QueuedCommand(command, receiver))
+      s._connection().send(_RespSerializer(command))
+    end
 
   fun ref on_response(s: Session ref, response: RespValue) =>
     try
@@ -456,11 +533,13 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
 
   fun ref on_closed(s: Session ref) =>
     _readbuf.clear()
+    _drain_send_buffer(s, SessionConnectionLost)
     _drain_pending(s, SessionConnectionLost)
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
 
   fun ref close(s: Session ref) =>
+    _drain_send_buffer(s, SessionClosed)
     _drain_pending(s, SessionClosed)
     _readbuf.clear()
     s._connection().send(_RespSerializer(["QUIT"]))
@@ -470,10 +549,43 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
 
   fun ref shutdown(s: Session ref) =>
     _readbuf.clear()
+    _drain_send_buffer(s, SessionProtocolError)
     _drain_pending(s, SessionProtocolError)
     s._connection().close()
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
+
+  fun ref on_throttled(s: Session ref) =>
+    _throttled = true
+    _notify.redis_session_throttled(s)
+
+  fun ref on_unthrottled(s: Session ref) =>
+    _notify.redis_session_unthrottled(s)
+    s._flush_backpressure()
+
+  fun ref flush_send_buffer(s: Session ref) =>
+    _throttled = false
+    while _send_buffer.size() > 0 do
+      try
+        let buffered = _send_buffer.shift()?
+        match s._connection().send(buffered.data)
+        | let _: lori.SendToken =>
+          match buffered.queued
+          | let qc: _QueuedCommand => _pending.push(qc)
+          end
+        | lori.SendErrorNotWriteable =>
+          _send_buffer.unshift(buffered)
+          _throttled = true
+          return
+        | lori.SendErrorNotConnected =>
+          _send_buffer.unshift(buffered)
+          shutdown(s)
+          return
+        end
+      else
+        _Unreachable()
+      end
+    end
 
   fun ref readbuf(): Reader =>
     _readbuf
@@ -491,8 +603,13 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
       for ch in channels.values() do arr.push(ch) end
       arr
     end
-    s._connection().send(_RespSerializer(cmd))
-    s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify)
+    if _throttled then
+      _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
+    else
+      s._connection().send(_RespSerializer(cmd))
+    end
+    s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify,
+      _throttled, _send_buffer)
 
   fun ref psubscribe(s: Session ref, patterns: Array[String] val,
     sub_notify: SubscriptionNotify)
@@ -504,14 +621,28 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
       for pat in patterns.values() do arr.push(pat) end
       arr
     end
-    s._connection().send(_RespSerializer(cmd))
-    s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify)
+    if _throttled then
+      _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
+    else
+      s._connection().send(_RespSerializer(cmd))
+    end
+    s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify,
+      _throttled, _send_buffer)
 
   fun ref _drain_pending(s: Session ref, reason: ClientError) =>
     for queued in _pending.values() do
       queued.receiver.redis_command_failed(s, queued.command, reason)
     end
     _pending.clear()
+
+  fun ref _drain_send_buffer(s: Session ref, reason: ClientError) =>
+    for buffered in _send_buffer.values() do
+      match buffered.queued
+      | let qc: _QueuedCommand =>
+        qc.receiver.redis_command_failed(s, qc.command, reason)
+      end
+    end
+    _send_buffer.clear()
 
 class ref _SessionSubscribed is _ConnectedState
   """
@@ -522,19 +653,28 @@ class ref _SessionSubscribed is _ConnectedState
   When the total subscription count (channels + patterns) reaches 0
   via unsubscribe/punsubscribe confirmations, the session transitions
   back to `_SessionReady` and `redis_session_ready` fires.
+
+  When TCP backpressure is active (`_throttled`), subscribe/unsubscribe
+  commands are buffered in `_send_buffer` instead of being sent
+  immediately.
   """
   let _notify: SessionStatusNotify
   let _readbuf: Reader
   let _pending: Array[_QueuedCommand]
   let _sub_notify: SubscriptionNotify
+  var _throttled: Bool
+  let _send_buffer: Array[_BufferedSend]
 
   new ref create(notify': SessionStatusNotify, readbuf': Reader,
-    pending': Array[_QueuedCommand], sub_notify': SubscriptionNotify)
+    pending': Array[_QueuedCommand], sub_notify': SubscriptionNotify,
+    throttled': Bool, send_buffer': Array[_BufferedSend])
   =>
     _notify = notify'
     _readbuf = readbuf'
     _pending = pending'
     _sub_notify = sub_notify'
+    _throttled = throttled'
+    _send_buffer = send_buffer'
 
   fun ref execute(s: Session ref, command: Array[ByteSeq] val,
     receiver: ResultReceiver)
@@ -589,7 +729,8 @@ class ref _SessionSubscribed is _ConnectedState
             _sub_notify.redis_unsubscribed(s, String.from_array(ch.value),
               count)
             if count == 0 then
-              s.state = _SessionReady.from_connected(_notify, _readbuf)
+              s.state = _SessionReady.from_subscribed(_notify, _readbuf,
+                _throttled, _send_buffer)
               _notify.redis_session_ready(s)
             end
           else
@@ -618,7 +759,8 @@ class ref _SessionSubscribed is _ConnectedState
             _sub_notify.redis_punsubscribed(s, String.from_array(pat.value),
               count)
             if count == 0 then
-              s.state = _SessionReady.from_connected(_notify, _readbuf)
+              s.state = _SessionReady.from_subscribed(_notify, _readbuf,
+                _throttled, _send_buffer)
               _notify.redis_session_ready(s)
             end
           else
@@ -656,7 +798,11 @@ class ref _SessionSubscribed is _ConnectedState
       for ch in channels.values() do arr.push(ch) end
       arr
     end
-    s._connection().send(_RespSerializer(cmd))
+    if _throttled then
+      _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
+    else
+      s._connection().send(_RespSerializer(cmd))
+    end
 
   fun ref psubscribe(s: Session ref, patterns: Array[String] val,
     sub_notify: SubscriptionNotify)
@@ -670,7 +816,11 @@ class ref _SessionSubscribed is _ConnectedState
       for pat in patterns.values() do arr.push(pat) end
       arr
     end
-    s._connection().send(_RespSerializer(cmd))
+    if _throttled then
+      _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
+    else
+      s._connection().send(_RespSerializer(cmd))
+    end
 
   fun ref unsubscribe(s: Session ref, channels: Array[String] val) =>
     let cmd = recover val
@@ -679,7 +829,11 @@ class ref _SessionSubscribed is _ConnectedState
       for ch in channels.values() do arr.push(ch) end
       arr
     end
-    s._connection().send(_RespSerializer(cmd))
+    if _throttled then
+      _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
+    else
+      s._connection().send(_RespSerializer(cmd))
+    end
 
   fun ref punsubscribe(s: Session ref, patterns: Array[String] val) =>
     let cmd = recover val
@@ -688,15 +842,53 @@ class ref _SessionSubscribed is _ConnectedState
       for pat in patterns.values() do arr.push(pat) end
       arr
     end
-    s._connection().send(_RespSerializer(cmd))
+    if _throttled then
+      _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
+    else
+      s._connection().send(_RespSerializer(cmd))
+    end
+
+  fun ref on_throttled(s: Session ref) =>
+    _throttled = true
+    _notify.redis_session_throttled(s)
+
+  fun ref on_unthrottled(s: Session ref) =>
+    _notify.redis_session_unthrottled(s)
+    s._flush_backpressure()
+
+  fun ref flush_send_buffer(s: Session ref) =>
+    _throttled = false
+    while _send_buffer.size() > 0 do
+      try
+        let buffered = _send_buffer.shift()?
+        match s._connection().send(buffered.data)
+        | let _: lori.SendToken =>
+          match buffered.queued
+          | let qc: _QueuedCommand => _pending.push(qc)
+          end
+        | lori.SendErrorNotWriteable =>
+          _send_buffer.unshift(buffered)
+          _throttled = true
+          return
+        | lori.SendErrorNotConnected =>
+          _send_buffer.unshift(buffered)
+          shutdown(s)
+          return
+        end
+      else
+        _Unreachable()
+      end
+    end
 
   fun ref on_closed(s: Session ref) =>
     _readbuf.clear()
+    _drain_send_buffer(s, SessionConnectionLost)
     _drain_pending(s, SessionConnectionLost)
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
 
   fun ref close(s: Session ref) =>
+    _drain_send_buffer(s, SessionClosed)
     _drain_pending(s, SessionClosed)
     _readbuf.clear()
     s._connection().send(_RespSerializer(["QUIT"]))
@@ -706,6 +898,7 @@ class ref _SessionSubscribed is _ConnectedState
 
   fun ref shutdown(s: Session ref) =>
     _readbuf.clear()
+    _drain_send_buffer(s, SessionProtocolError)
     _drain_pending(s, SessionProtocolError)
     s._connection().close()
     s.state = _SessionClosed
@@ -723,7 +916,16 @@ class ref _SessionSubscribed is _ConnectedState
     end
     _pending.clear()
 
-class ref _SessionClosed is (_ClosedState & _NotSubscribed)
+  fun ref _drain_send_buffer(s: Session ref, reason: ClientError) =>
+    for buffered in _send_buffer.values() do
+      match buffered.queued
+      | let qc: _QueuedCommand =>
+        qc.receiver.redis_command_failed(s, qc.command, reason)
+      end
+    end
+    _send_buffer.clear()
+
+class ref _SessionClosed is (_ClosedState & _NotSubscribed & _NotThrottleable)
   """
   Terminal state. The session is closed and cannot be reused.
   """
