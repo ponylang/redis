@@ -45,7 +45,7 @@ Package: `redis`
 - `SessionStatusNotify` (in `session_status_notify.pony`): Lifecycle callback interface. All callbacks have default no-op implementations. Callbacks: `redis_session_connected`, `redis_session_connection_failed`, `redis_session_ready`, `redis_session_authentication_failed`, `redis_session_closed`.
 - `ResultReceiver` (in `result_receiver.pony`): Command response callback interface. Callbacks: `redis_response`, `redis_command_failed`.
 - `SubscriptionNotify` (in `subscription_notify.pony`): Pub/sub callback interface. All callbacks have default no-op implementations. Callbacks: `redis_subscribed`, `redis_unsubscribed`, `redis_message`, `redis_psubscribed`, `redis_punsubscribed`, `redis_pmessage`.
-- `ClientError` (in `client_error.pony`): Client-side error trait with `SessionNotReady`, `SessionClosed`, and `SessionInSubscribedMode` primitives.
+- `ClientError` (in `client_error.pony`): Client-side error trait with `SessionNotReady`, `SessionClosed`, `SessionConnectionLost`, `SessionProtocolError`, and `SessionInSubscribedMode` primitives.
 - `_ResponseHandler` (in `_response_handler.pony`): Loops `_RespParser` over a `buffered.Reader`, routing `RespPush` to `on_push` and other `RespValue`s to `on_response`. Shuts down on `RespMalformed`.
 - `_BuildHelloCommand` / `_BuildAuthCommand` (primitives in `session.pony`): Build HELLO 3 and AUTH commands for protocol negotiation and authentication.
 - `_IllegalState` / `_Unreachable` (in `_mort.pony`): Primitives for detecting impossible states.

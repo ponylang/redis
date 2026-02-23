@@ -55,8 +55,9 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
   be close() =>
     """
     Close the session. Sends a QUIT command to the server before closing
-    the TCP connection. Pending commands receive `SessionClosed` via
-    `redis_command_failed`.
+    the TCP connection. In-flight commands in the pending queue receive
+    `SessionClosed` via `redis_command_failed`. Commands sent after the
+    session is closed also receive `SessionClosed`.
     """
     state.close(this)
 
@@ -455,12 +456,12 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
 
   fun ref on_closed(s: Session ref) =>
     _readbuf.clear()
-    _drain_pending(s)
+    _drain_pending(s, SessionConnectionLost)
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
 
   fun ref close(s: Session ref) =>
-    _drain_pending(s)
+    _drain_pending(s, SessionClosed)
     _readbuf.clear()
     s._connection().send(_RespSerializer(["QUIT"]))
     s._connection().close()
@@ -469,7 +470,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
 
   fun ref shutdown(s: Session ref) =>
     _readbuf.clear()
-    _drain_pending(s)
+    _drain_pending(s, SessionProtocolError)
     s._connection().close()
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
@@ -506,9 +507,9 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     s._connection().send(_RespSerializer(cmd))
     s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify)
 
-  fun ref _drain_pending(s: Session ref) =>
+  fun ref _drain_pending(s: Session ref, reason: ClientError) =>
     for queued in _pending.values() do
-      queued.receiver.redis_command_failed(s, queued.command, SessionClosed)
+      queued.receiver.redis_command_failed(s, queued.command, reason)
     end
     _pending.clear()
 
@@ -691,12 +692,12 @@ class ref _SessionSubscribed is _ConnectedState
 
   fun ref on_closed(s: Session ref) =>
     _readbuf.clear()
-    _drain_pending(s)
+    _drain_pending(s, SessionConnectionLost)
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
 
   fun ref close(s: Session ref) =>
-    _drain_pending(s)
+    _drain_pending(s, SessionClosed)
     _readbuf.clear()
     s._connection().send(_RespSerializer(["QUIT"]))
     s._connection().close()
@@ -705,7 +706,7 @@ class ref _SessionSubscribed is _ConnectedState
 
   fun ref shutdown(s: Session ref) =>
     _readbuf.clear()
-    _drain_pending(s)
+    _drain_pending(s, SessionProtocolError)
     s._connection().close()
     s.state = _SessionClosed
     _notify.redis_session_closed(s)
@@ -716,9 +717,9 @@ class ref _SessionSubscribed is _ConnectedState
   fun notify(): SessionStatusNotify =>
     _notify
 
-  fun ref _drain_pending(s: Session ref) =>
+  fun ref _drain_pending(s: Session ref, reason: ClientError) =>
     for queued in _pending.values() do
-      queued.receiver.redis_command_failed(s, queued.command, SessionClosed)
+      queued.receiver.redis_command_failed(s, queued.command, reason)
     end
     _pending.clear()
 

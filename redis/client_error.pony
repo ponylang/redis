@@ -1,7 +1,9 @@
 trait val ClientError
   """
-  A client-side error that prevented a command from being sent to the server.
-  Each subtype represents a specific pre-condition failure.
+  A client-side error delivered via `redis_command_failed`. Covers two
+  categories: pre-condition failures (the command was never sent) and
+  in-flight losses (the command was sent but its response will never arrive
+  because the connection was lost or the data stream became corrupt).
   """
   fun message(): String
 
@@ -15,11 +17,29 @@ primitive SessionNotReady is ClientError
 
 primitive SessionClosed is ClientError
   """
-  Error returned when a command is attempted on a session that has been
-  closed. Includes sessions closed by the user, by the server, or due to
-  connection or authentication failures.
+  Error returned when a command is attempted on a session that has already
+  been closed, or when a user-initiated `close()` drains in-flight commands
+  from the pending queue. Does not cover connection drops
+  (`SessionConnectionLost`) or protocol errors (`SessionProtocolError`).
   """
   fun message(): String => "Session is closed"
+
+primitive SessionConnectionLost is ClientError
+  """
+  Error returned when the connection to the Redis server was lost
+  unexpectedly. In-flight commands that were awaiting responses receive
+  this error via `redis_command_failed`.
+  """
+  fun message(): String => "Connection to Redis server was lost"
+
+primitive SessionProtocolError is ClientError
+  """
+  Error returned when the server sent data that does not conform to the
+  RESP protocol. The data stream is corrupt and cannot be resynchronized,
+  so the connection is closed. In-flight commands receive this error via
+  `redis_command_failed`.
+  """
+  fun message(): String => "Protocol error: received malformed data"
 
 primitive SessionInSubscribedMode is ClientError
   """

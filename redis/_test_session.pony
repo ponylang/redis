@@ -636,14 +636,26 @@ actor \nodoc\ _PipelineCloseClient is (SessionStatusNotify & ResultReceiver)
   be redis_command_failed(session: Session,
     command: Array[ByteSeq] val, failure: ClientError)
   =>
+    // Both SessionClosed and SessionConnectionLost are valid here:
+    // close() drains pending with SessionClosed, but if lori's
+    // on_closed fires first, pending is drained with
+    // SessionConnectionLost instead. Which happens depends on
+    // whether the close behavior or the connection drop is
+    // processed first.
     match failure
     | SessionClosed =>
       _callback_count = _callback_count + 1
       if _callback_count == 5 then
         _h.complete(true)
       end
+    | SessionConnectionLost =>
+      _callback_count = _callback_count + 1
+      if _callback_count == 5 then
+        _h.complete(true)
+      end
     else
-      _h.fail("Expected SessionClosed, got: " + failure.message())
+      _h.fail("Expected SessionClosed or SessionConnectionLost, got: "
+        + failure.message())
       _h.complete(false)
     end
 
