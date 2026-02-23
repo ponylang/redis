@@ -13,12 +13,13 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
   immediately without waiting for prior responses. Responses are matched
   to receivers in FIFO order.
 
-  When the TCP connection's send buffer fills, the session automatically
-  buffers commands internally and flushes them when the connection becomes
-  writeable. The `redis_session_throttled` and `redis_session_unthrottled`
-  callbacks on `SessionStatusNotify` inform the application of
-  backpressure state changes. No action is required — buffering is
-  transparent.
+  When the TCP connection's send buffer fills, the session buffers commands
+  internally (up to `send_buffer_limit` commands, default 1024) and
+  flushes them when the connection becomes writeable. If the buffer is
+  full, `execute()` rejects the command via `redis_command_failed` with
+  `SessionBackpressureOverflow`. The `redis_session_throttled` and
+  `redis_session_unthrottled` callbacks on `SessionStatusNotify` inform
+  the application of backpressure state changes.
 
   To enter pub/sub mode, call `subscribe()` or `psubscribe()` with a
   `SubscriptionNotify` receiver. While subscribed, `execute()` is rejected
@@ -312,14 +313,16 @@ class ref _SessionUnopened is
         let data = _RespSerializer(cmd)
         match s._connection().send(data)
         | let _: lori.SendToken =>
-          s.state = _SessionConnected(_notify)
+          s.state = _SessionConnected(_notify,
+            _connect_info.send_buffer_limit)
         else
           s._connection().close()
           s.state = _SessionClosed
           _notify.redis_session_closed(s)
         end
       | None =>
-        s.state = _SessionReady(_notify)
+        s.state = _SessionReady(_notify,
+          _connect_info.send_buffer_limit)
         _notify.redis_session_ready(s)
       end
     end
@@ -368,7 +371,8 @@ class ref _SessionNegotiating is
   fun ref on_response(s: Session ref, response: RespValue) =>
     match response
     | let _: RespMap =>
-      s.state = _SessionReady.from_connected(_notify, _readbuf)
+      s.state = _SessionReady.from_connected(_notify, _readbuf,
+        _connect_info.send_buffer_limit)
       _notify.redis_session_ready(s)
     | let err: RespError =>
       // HELLO not supported — fall back to RESP2.
@@ -378,12 +382,14 @@ class ref _SessionNegotiating is
         let data = _RespSerializer(cmd)
         match s._connection().send(data)
         | let _: lori.SendToken =>
-          s.state = _SessionConnected.from_negotiating(_notify, _readbuf)
+          s.state = _SessionConnected.from_negotiating(_notify, _readbuf,
+            _connect_info.send_buffer_limit)
         else
           shutdown(s, SessionConnectionLost)
         end
       | None =>
-        s.state = _SessionReady.from_connected(_notify, _readbuf)
+        s.state = _SessionReady.from_connected(_notify, _readbuf,
+          _connect_info.send_buffer_limit)
         _notify.redis_session_ready(s)
       end
     else
@@ -423,19 +429,27 @@ class ref _SessionConnected is
   """
   let _notify: SessionStatusNotify
   let _readbuf: Reader
+  let _send_buffer_limit: USize
 
-  new ref create(notify': SessionStatusNotify) =>
+  new ref create(notify': SessionStatusNotify,
+    send_buffer_limit': USize)
+  =>
     _notify = notify'
     _readbuf = Reader
+    _send_buffer_limit = send_buffer_limit'
 
-  new ref from_negotiating(notify': SessionStatusNotify, readbuf': Reader) =>
+  new ref from_negotiating(notify': SessionStatusNotify, readbuf': Reader,
+    send_buffer_limit': USize)
+  =>
     _notify = notify'
     _readbuf = readbuf'
+    _send_buffer_limit = send_buffer_limit'
 
   fun ref on_response(s: Session ref, response: RespValue) =>
     match response
     | let ok: RespSimpleString if ok.value == "OK" =>
-      s.state = _SessionReady.from_connected(_notify, _readbuf)
+      s.state = _SessionReady.from_connected(_notify, _readbuf,
+        _send_buffer_limit)
       _notify.redis_session_ready(s)
     | let err: RespError =>
       _notify.redis_session_authentication_failed(s, err.message)
@@ -502,38 +516,54 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
 
   When TCP backpressure is active (`_throttled`), commands are serialized
   and buffered in `_send_buffer` instead of being sent immediately. The
-  buffer is flushed when backpressure is released.
+  buffer is bounded by `_send_buffer_limit` — commands that exceed the
+  limit are rejected with `SessionBackpressureOverflow`. The buffer is
+  flushed when backpressure is released.
   """
   let _notify: SessionStatusNotify
   let _readbuf: Reader
   let _pending: Array[_QueuedCommand] = _pending.create()
   var _throttled: Bool
   let _send_buffer: Array[_BufferedSend]
+  let _send_buffer_limit: USize
 
-  new ref create(notify': SessionStatusNotify) =>
+  new ref create(notify': SessionStatusNotify,
+    send_buffer_limit': USize)
+  =>
     _notify = notify'
     _readbuf = Reader
     _throttled = false
     _send_buffer = Array[_BufferedSend]
+    _send_buffer_limit = send_buffer_limit'
 
-  new ref from_connected(notify': SessionStatusNotify, readbuf': Reader) =>
+  new ref from_connected(notify': SessionStatusNotify, readbuf': Reader,
+    send_buffer_limit': USize)
+  =>
     _notify = notify'
     _readbuf = readbuf'
     _throttled = false
     _send_buffer = Array[_BufferedSend]
+    _send_buffer_limit = send_buffer_limit'
 
   new ref from_subscribed(notify': SessionStatusNotify, readbuf': Reader,
-    throttled': Bool, send_buffer': Array[_BufferedSend])
+    throttled': Bool, send_buffer': Array[_BufferedSend],
+    send_buffer_limit': USize)
   =>
     _notify = notify'
     _readbuf = readbuf'
     _throttled = throttled'
     _send_buffer = send_buffer'
+    _send_buffer_limit = send_buffer_limit'
 
   fun ref execute(s: Session ref, command: Array[ByteSeq] val,
     receiver: ResultReceiver)
   =>
     if _throttled then
+      if _send_buffer.size() >= _send_buffer_limit then
+        receiver.redis_command_failed(s, command,
+          SessionBackpressureOverflow)
+        return
+      end
       _send_buffer.push(
         _BufferedSend(_RespSerializer(command),
           _QueuedCommand(command, receiver)))
@@ -649,7 +679,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
       end
     end
     s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify,
-      _throttled, _send_buffer)
+      _throttled, _send_buffer, _send_buffer_limit)
 
   fun ref psubscribe(s: Session ref, patterns: Array[String] val,
     sub_notify: SubscriptionNotify)
@@ -677,7 +707,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
       end
     end
     s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify,
-      _throttled, _send_buffer)
+      _throttled, _send_buffer, _send_buffer_limit)
 
   fun ref _drain_pending(s: Session ref, reason: ClientError) =>
     for queued in _pending.values() do
@@ -714,10 +744,12 @@ class ref _SessionSubscribed is _ConnectedState
   let _sub_notify: SubscriptionNotify
   var _throttled: Bool
   let _send_buffer: Array[_BufferedSend]
+  let _send_buffer_limit: USize
 
   new ref create(notify': SessionStatusNotify, readbuf': Reader,
     pending': Array[_QueuedCommand], sub_notify': SubscriptionNotify,
-    throttled': Bool, send_buffer': Array[_BufferedSend])
+    throttled': Bool, send_buffer': Array[_BufferedSend],
+    send_buffer_limit': USize)
   =>
     _notify = notify'
     _readbuf = readbuf'
@@ -725,6 +757,7 @@ class ref _SessionSubscribed is _ConnectedState
     _sub_notify = sub_notify'
     _throttled = throttled'
     _send_buffer = send_buffer'
+    _send_buffer_limit = send_buffer_limit'
 
   fun ref execute(s: Session ref, command: Array[ByteSeq] val,
     receiver: ResultReceiver)
@@ -780,7 +813,7 @@ class ref _SessionSubscribed is _ConnectedState
               count)
             if count == 0 then
               s.state = _SessionReady.from_subscribed(_notify, _readbuf,
-                _throttled, _send_buffer)
+                _throttled, _send_buffer, _send_buffer_limit)
               _notify.redis_session_ready(s)
             end
           else
@@ -810,7 +843,7 @@ class ref _SessionSubscribed is _ConnectedState
               count)
             if count == 0 then
               s.state = _SessionReady.from_subscribed(_notify, _readbuf,
-                _throttled, _send_buffer)
+                _throttled, _send_buffer, _send_buffer_limit)
               _notify.redis_session_ready(s)
             end
           else

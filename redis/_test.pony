@@ -68,6 +68,9 @@ actor \nodoc\ Main is TestList
     test(_TestSessionResp3SetAndGet)
     test(_TestSessionResp3FallbackToResp2)
 
+    // Session backpressure test (uses fake server, no Redis needed)
+    test(_TestSessionBackpressureOverflow)
+
     // Command construction unit tests
     test(_TestBuildHelloCommand)
     test(_TestBuildAuthCommand)

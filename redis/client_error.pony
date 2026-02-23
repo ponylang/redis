@@ -51,3 +51,15 @@ primitive SessionInSubscribedMode is ClientError
   session for commands.
   """
   fun message(): String => "Session is in subscribed mode"
+
+primitive SessionBackpressureOverflow is ClientError
+  """
+  Error returned when `execute()` is called during TCP backpressure and
+  the internal send buffer has reached its configured limit
+  (`send_buffer_limit` in `ConnectInfo`). The command is rejected — it
+  was not sent and will not be retried automatically.
+
+  To handle this, reduce the sending rate (e.g., stop sending until
+  `redis_session_unthrottled` fires) or increase the buffer limit.
+  """
+  fun message(): String => "Send buffer full — command rejected"
