@@ -106,6 +106,32 @@ let session = Session(info, notify)
 Redis uses direct TLS (typically on port 6380) rather than STARTTLS
 negotiation.
 
+## Backpressure
+
+When the TCP connection's send buffer fills (the OS socket buffer is full),
+commands are buffered internally and flushed automatically when the
+connection becomes writeable. The `redis_session_throttled` and
+`redis_session_unthrottled` callbacks on `SessionStatusNotify` inform the
+application of backpressure state changes:
+
+```pony
+actor MyApp is (SessionStatusNotify & ResultReceiver)
+  // ...
+
+  be redis_session_throttled(session: Session) =>
+    // TCP send buffer full — commands are being buffered internally.
+    // Optionally reduce sending rate.
+    None
+
+  be redis_session_unthrottled(session: Session) =>
+    // Backpressure released — buffered commands are being flushed.
+    None
+```
+
+No action is required from the application — buffering and flushing happen
+transparently. The callbacks are informational, allowing applications to
+adapt their sending rate if desired.
+
 ## RESP3
 
 To enable RESP3 protocol features, set `protocol' = Resp3` in `ConnectInfo`:

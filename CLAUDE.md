@@ -42,12 +42,13 @@ Package: `redis`
 
 - `Session` (actor in `session.pony`): Main entry point. Manages connection lifecycle and pub/sub via a state machine. Implements `lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver`. All state machine classes (`_SessionUnopened`, `_SessionNegotiating`, `_SessionConnected`, `_SessionReady`, `_SessionSubscribed`, `_SessionClosed`) are in `session.pony`, following the postgres pattern.
 - `ConnectInfo` (in `connect_info.pony`): Connection configuration (host, port, optional password, SSL mode, optional username, protocol version).
-- `SessionStatusNotify` (in `session_status_notify.pony`): Lifecycle callback interface. All callbacks have default no-op implementations. Callbacks: `redis_session_connected`, `redis_session_connection_failed`, `redis_session_ready`, `redis_session_authentication_failed`, `redis_session_closed`.
+- `SessionStatusNotify` (in `session_status_notify.pony`): Lifecycle callback interface. All callbacks have default no-op implementations. Callbacks: `redis_session_connected`, `redis_session_connection_failed`, `redis_session_ready`, `redis_session_authentication_failed`, `redis_session_throttled`, `redis_session_unthrottled`, `redis_session_closed`.
 - `ResultReceiver` (in `result_receiver.pony`): Command response callback interface. Callbacks: `redis_response`, `redis_command_failed`.
 - `SubscriptionNotify` (in `subscription_notify.pony`): Pub/sub callback interface. All callbacks have default no-op implementations. Callbacks: `redis_subscribed`, `redis_unsubscribed`, `redis_message`, `redis_psubscribed`, `redis_punsubscribed`, `redis_pmessage`.
 - `ClientError` (in `client_error.pony`): Client-side error trait with `SessionNotReady`, `SessionClosed`, `SessionConnectionLost`, `SessionProtocolError`, and `SessionInSubscribedMode` primitives.
 - `_ResponseHandler` (in `_response_handler.pony`): Loops `_RespParser` over a `buffered.Reader`, routing `RespPush` to `on_push` and other `RespValue`s to `on_response`. Shuts down on `RespMalformed`.
 - `_BuildHelloCommand` / `_BuildAuthCommand` (primitives in `session.pony`): Build HELLO 3 and AUTH commands for protocol negotiation and authentication.
+- `_BufferedSend` (class val in `session.pony`): Serialized command buffered during backpressure. Holds wire-format bytes and an optional `_QueuedCommand` for response matching.
 - `_IllegalState` / `_Unreachable` (in `_mort.pony`): Primitives for detecting impossible states.
 
 ### Command Builders
@@ -80,6 +81,7 @@ Fixed-argument commands use `recover val [as ByteSeq: ...] end`. Variadic comman
 - `_ConnectedState`: Mixin for states with a readbuf — handles `on_received` and `_ResponseHandler` dispatch.
 - `_NotReadyForCommands`: Mixin that rejects `execute()` with `SessionNotReady`.
 - `_NotSubscribed`: Mixin that no-ops `subscribe`, `unsubscribe`, `psubscribe`, `punsubscribe` for states where pub/sub is not applicable. Also provides a no-op `on_push` for states that don't handle push messages (only trait that provides `on_push`, to avoid diamond inheritance in `_SessionClosed`).
+- `_NotThrottleable`: Mixin that no-ops `on_throttled`, `on_unthrottled`, and `flush_send_buffer` for states that don't handle backpressure (pre-ready states, closed state).
 
 ### State Machine
 
@@ -102,7 +104,7 @@ _SessionSubscribed ──unsub count 0──► _SessionReady
                    ──close/error──► _SessionClosed
 ```
 
-Commands are pipelined in `_SessionReady`: each `execute()` call sends the command immediately over the wire without waiting for prior responses. Responses are matched to receivers in FIFO order.
+Commands are pipelined in `_SessionReady`: each `execute()` call sends the command immediately over the wire without waiting for prior responses. Responses are matched to receivers in FIFO order. When TCP backpressure is active, commands are serialized and buffered in a `_send_buffer` instead of being sent immediately. The buffer is flushed via a deferred `_flush_backpressure` behavior when backpressure is released. Both `_SessionReady` and `_SessionSubscribed` carry `_throttled` and `_send_buffer` state, which is passed across transitions between the two states.
 
 In `_SessionSubscribed`, any pipelined commands that were in-flight when SUBSCRIBE was sent are drained first (Redis guarantees in-order response delivery), then incoming responses are routed as pub/sub messages. In RESP3 mode, pub/sub messages arrive as `RespPush` via `on_push`; in RESP2 mode they arrive as `RespArray` via `on_response`.
 
