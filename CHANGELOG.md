@@ -6,9 +6,11 @@ All notable changes to this project will be documented in this file. This projec
 
 ### Fixed
 
+- Fix send() return value checks in non-throttled code paths ([PR #28](https://github.com/ponylang/redis/pull/28))
 
 ### Added
 
 
 ### Changed
+
 
