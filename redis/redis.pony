@@ -23,7 +23,7 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
     if RespConvert.is_ok(response) then
       session.execute(RedisString.get("key"), this)
     else
-      match \exhaustive\ RespConvert.as_string(response)
+      match RespConvert.as_string(response)
       | let value: String => // use value
         None
       end
@@ -133,7 +133,7 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
   be redis_command_failed(session: Session,
     command: Array[ByteSeq] val, failure: ClientError)
   =>
-    match \exhaustive\ failure
+    match failure
     | SessionBackpressureOverflow =>
       // Buffer full — stop sending until unthrottled.
       None
@@ -227,13 +227,13 @@ For commands not covered by the builders, construct the array directly:
 if RespConvert.is_ok(response) then ... end
 
 // Extract a string (from simple string, bulk string, or verbatim string)
-match \exhaustive\ RespConvert.as_string(response)
+match RespConvert.as_string(response)
 | let value: String => // use value
 | RespNull => // key did not exist
 end
 
 // Extract an error message (from RespError or RespBulkError)
-match \exhaustive\ RespConvert.as_error(response)
+match RespConvert.as_error(response)
 | let msg: String => // handle error
 end
 ```
