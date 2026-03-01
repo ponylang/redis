@@ -32,7 +32,7 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
 
   new create(connect_info': ConnectInfo, notify': SessionStatusNotify) =>
     state = _SessionUnopened(notify', connect_info')
-    _tcp_connection = match connect_info'.ssl_mode
+    _tcp_connection = match \exhaustive\ connect_info'.ssl_mode
     | SSLDisabled =>
       lori.TCPConnection.client(
         connect_info'.auth,
@@ -294,7 +294,7 @@ class ref _SessionUnopened is
 
   fun on_connected(s: Session ref) =>
     _notify.redis_session_connected(s)
-    match _connect_info.protocol
+    match \exhaustive\ _connect_info.protocol
     | Resp3 =>
       let cmd = _BuildHelloCommand(_connect_info)
       let data = _RespSerializer(cmd)
@@ -307,7 +307,7 @@ class ref _SessionUnopened is
         _notify.redis_session_closed(s)
       end
     | Resp2 =>
-      match _connect_info.password
+      match \exhaustive\ _connect_info.password
       | let password: String =>
         let cmd = _BuildAuthCommand(_connect_info.username, password)
         let data = _RespSerializer(cmd)
@@ -376,7 +376,7 @@ class ref _SessionNegotiating is
       _notify.redis_session_ready(s)
     | let err: RespError =>
       // HELLO not supported — fall back to RESP2.
-      match _connect_info.password
+      match \exhaustive\ _connect_info.password
       | let password: String =>
         let cmd = _BuildAuthCommand(_connect_info.username, password)
         let data = _RespSerializer(cmd)
@@ -446,7 +446,7 @@ class ref _SessionConnected is
     _send_buffer_limit = send_buffer_limit'
 
   fun ref on_response(s: Session ref, response: RespValue) =>
-    match response
+    match \exhaustive\ response
     | let ok: RespSimpleString if ok.value == "OK" =>
       s.state = _SessionReady.from_connected(_notify, _readbuf,
         _send_buffer_limit)
@@ -569,7 +569,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
           _QueuedCommand(command, receiver)))
     else
       let data = _RespSerializer(command)
-      match s._connection().send(data)
+      match \exhaustive\ s._connection().send(data)
       | let _: lori.SendToken =>
         _pending.push(_QueuedCommand(command, receiver))
       | lori.SendErrorNotWriteable =>
@@ -628,7 +628,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     while _send_buffer.size() > 0 do
       try
         let buffered = _send_buffer.shift()?
-        match s._connection().send(buffered.data)
+        match \exhaustive\ s._connection().send(buffered.data)
         | let _: lori.SendToken =>
           match buffered.queued
           | let qc: _QueuedCommand => _pending.push(qc)
@@ -667,7 +667,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
       let data = _RespSerializer(cmd)
-      match s._connection().send(data)
+      match \exhaustive\ s._connection().send(data)
       | let _: lori.SendToken => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
@@ -695,7 +695,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
       let data = _RespSerializer(cmd)
-      match s._connection().send(data)
+      match \exhaustive\ s._connection().send(data)
       | let _: lori.SendToken => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
@@ -885,7 +885,7 @@ class ref _SessionSubscribed is _ConnectedState
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
       let data = _RespSerializer(cmd)
-      match s._connection().send(data)
+      match \exhaustive\ s._connection().send(data)
       | let _: lori.SendToken => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
@@ -912,7 +912,7 @@ class ref _SessionSubscribed is _ConnectedState
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
       let data = _RespSerializer(cmd)
-      match s._connection().send(data)
+      match \exhaustive\ s._connection().send(data)
       | let _: lori.SendToken => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
@@ -934,7 +934,7 @@ class ref _SessionSubscribed is _ConnectedState
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
       let data = _RespSerializer(cmd)
-      match s._connection().send(data)
+      match \exhaustive\ s._connection().send(data)
       | let _: lori.SendToken => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
@@ -956,7 +956,7 @@ class ref _SessionSubscribed is _ConnectedState
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
       let data = _RespSerializer(cmd)
-      match s._connection().send(data)
+      match \exhaustive\ s._connection().send(data)
       | let _: lori.SendToken => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
@@ -980,7 +980,7 @@ class ref _SessionSubscribed is _ConnectedState
     while _send_buffer.size() > 0 do
       try
         let buffered = _send_buffer.shift()?
-        match s._connection().send(buffered.data)
+        match \exhaustive\ s._connection().send(buffered.data)
         | let _: lori.SendToken =>
           match buffered.queued
           | let qc: _QueuedCommand => _pending.push(qc)
@@ -1055,9 +1055,9 @@ primitive _BuildHelloCommand
   configured, includes AUTH credentials in the HELLO command.
   """
   fun apply(info: ConnectInfo): Array[ByteSeq] val =>
-    match info.password
+    match \exhaustive\ info.password
     | let password: String =>
-      let user = match info.username
+      let user = match \exhaustive\ info.username
       | let u: String => u
       | None => "default"
       end
@@ -1074,7 +1074,7 @@ primitive _BuildAuthCommand
   fun apply(username: (String | None), password: String)
     : Array[ByteSeq] val
   =>
-    match username
+    match \exhaustive\ username
     | let user: String =>
       recover val [as ByteSeq: "AUTH"; user; password] end
     | None =>

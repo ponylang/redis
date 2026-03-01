@@ -17,7 +17,7 @@ primitive _RespSerializer
       buf.push('\n')
 
       for elem in command.values() do
-        let elem_size = match elem
+        let elem_size = match \exhaustive\ elem
         | let s: String val => s.size()
         | let a: Array[U8] val => a.size()
         end
@@ -31,7 +31,7 @@ primitive _RespSerializer
         buf.push('\n')
 
         // <data>\r\n
-        match elem
+        match \exhaustive\ elem
         | let s: String val =>
           for byte in s.values() do buf.push(byte) end
         | let a: Array[U8] val =>

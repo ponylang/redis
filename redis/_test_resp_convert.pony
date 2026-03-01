@@ -12,20 +12,20 @@ class \nodoc\ iso _TestRespConvertAsString is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_string(value)
-    match value
+    match \exhaustive\ value
     | let s: RespSimpleString =>
-      match result
+      match \exhaustive\ result
       | let r: String => h.assert_eq[String](s.value, r)
       else h.fail("Expected String for RespSimpleString")
       end
     | let b: RespBulkString =>
-      match result
+      match \exhaustive\ result
       | let r: String =>
         h.assert_eq[String](String.from_array(b.value), r)
       else h.fail("Expected String for RespBulkString")
       end
     | let v: RespVerbatimString =>
-      match result
+      match \exhaustive\ result
       | let r: String =>
         h.assert_eq[String](String.from_array(v.value), r)
       else h.fail("Expected String for RespVerbatimString")
@@ -36,7 +36,7 @@ class \nodoc\ iso _TestRespConvertAsString is Property1[RespValue]
       else h.fail("Expected RespNull for RespNull input")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-matching type")
       end
@@ -49,15 +49,15 @@ class \nodoc\ iso _TestRespConvertAsBytes is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_bytes(value)
-    match value
+    match \exhaustive\ value
     | let b: RespBulkString =>
-      match result
+      match \exhaustive\ result
       | let bytes: Array[U8] val =>
         h.assert_true(bytes is b.value)
       else h.fail("Expected Array[U8] for RespBulkString")
       end
     | let v: RespVerbatimString =>
-      match result
+      match \exhaustive\ result
       | let bytes: Array[U8] val =>
         h.assert_true(bytes is v.value)
       else h.fail("Expected Array[U8] for RespVerbatimString")
@@ -68,7 +68,7 @@ class \nodoc\ iso _TestRespConvertAsBytes is Property1[RespValue]
       else h.fail("Expected RespNull for RespNull input")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-matching type")
       end
@@ -81,9 +81,9 @@ class \nodoc\ iso _TestRespConvertAsInteger is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_integer(value)
-    match value
+    match \exhaustive\ value
     | let i: RespInteger =>
-      match result
+      match \exhaustive\ result
       | let r: I64 => h.assert_eq[I64](i.value, r)
       else h.fail("Expected I64 for RespInteger")
       end
@@ -93,7 +93,7 @@ class \nodoc\ iso _TestRespConvertAsInteger is Property1[RespValue]
       else h.fail("Expected RespNull for RespNull input")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-matching type")
       end
@@ -106,9 +106,9 @@ class \nodoc\ iso _TestRespConvertAsBool is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_bool(value)
-    match value
+    match \exhaustive\ value
     | let b: RespBoolean =>
-      match result
+      match \exhaustive\ result
       | let r: Bool => h.assert_eq[Bool](b.value, r)
       else h.fail("Expected Bool for RespBoolean")
       end
@@ -118,7 +118,7 @@ class \nodoc\ iso _TestRespConvertAsBool is Property1[RespValue]
       else h.fail("Expected RespNull for RespNull input")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-matching type")
       end
@@ -131,9 +131,9 @@ class \nodoc\ iso _TestRespConvertAsArray is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_array(value)
-    match value
+    match \exhaustive\ value
     | let a: RespArray =>
-      match result
+      match \exhaustive\ result
       | let arr: Array[RespValue] val =>
         h.assert_true(arr is a.values)
       else h.fail("Expected Array[RespValue] for RespArray")
@@ -144,7 +144,7 @@ class \nodoc\ iso _TestRespConvertAsArray is Property1[RespValue]
       else h.fail("Expected RespNull for RespNull input")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-matching type")
       end
@@ -157,9 +157,9 @@ class \nodoc\ iso _TestRespConvertAsDouble is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_double(value)
-    match value
+    match \exhaustive\ value
     | let d: RespDouble =>
-      match result
+      match \exhaustive\ result
       | let r: F64 => h.assert_eq[F64](d.value, r)
       else h.fail("Expected F64 for RespDouble")
       end
@@ -169,7 +169,7 @@ class \nodoc\ iso _TestRespConvertAsDouble is Property1[RespValue]
       else h.fail("Expected RespNull for RespNull input")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-matching type")
       end
@@ -182,9 +182,9 @@ class \nodoc\ iso _TestRespConvertAsBigNumber is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_big_number(value)
-    match value
+    match \exhaustive\ value
     | let bn: RespBigNumber =>
-      match result
+      match \exhaustive\ result
       | let r: String => h.assert_eq[String](bn.value, r)
       else h.fail("Expected String for RespBigNumber")
       end
@@ -194,7 +194,7 @@ class \nodoc\ iso _TestRespConvertAsBigNumber is Property1[RespValue]
       else h.fail("Expected RespNull for RespNull input")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-matching type")
       end
@@ -207,9 +207,9 @@ class \nodoc\ iso _TestRespConvertAsMap is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_map(value)
-    match value
+    match \exhaustive\ value
     | let m: RespMap =>
-      match result
+      match \exhaustive\ result
       | let pairs: Array[(RespValue, RespValue)] val =>
         h.assert_true(pairs is m.pairs)
       else h.fail("Expected Array pairs for RespMap")
@@ -220,7 +220,7 @@ class \nodoc\ iso _TestRespConvertAsMap is Property1[RespValue]
       else h.fail("Expected RespNull for RespNull input")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-matching type")
       end
@@ -233,9 +233,9 @@ class \nodoc\ iso _TestRespConvertAsSet is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_set(value)
-    match value
+    match \exhaustive\ value
     | let s: RespSet =>
-      match result
+      match \exhaustive\ result
       | let arr: Array[RespValue] val =>
         h.assert_true(arr is s.values)
       else h.fail("Expected Array[RespValue] for RespSet")
@@ -246,7 +246,7 @@ class \nodoc\ iso _TestRespConvertAsSet is Property1[RespValue]
       else h.fail("Expected RespNull for RespNull input")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-matching type")
       end
@@ -259,9 +259,9 @@ class \nodoc\ iso _TestRespConvertAsError is Property1[RespValue]
 
   fun property(value: RespValue, h: PropertyHelper) =>
     let result = RespConvert.as_error(value)
-    match value
+    match \exhaustive\ value
     | let e: RespError =>
-      match result
+      match \exhaustive\ result
       | let r: String => h.assert_eq[String](e.message, r)
       else h.fail("Expected String for RespError")
       end
@@ -272,7 +272,7 @@ class \nodoc\ iso _TestRespConvertAsError is Property1[RespValue]
       else h.fail("Expected String for RespBulkError")
       end
     else
-      match result
+      match \exhaustive\ result
       | None => None
       else h.fail("Expected None for non-error type")
       end

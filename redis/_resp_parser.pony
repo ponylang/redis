@@ -11,7 +11,7 @@ primitive _RespParser
   buffer in an indeterminate state (the session should be closed anyway).
   """
   fun apply(buffer: Reader): (RespValue | None | RespMalformed) =>
-    match _complete_size(buffer, 0)
+    match \exhaustive\ _complete_size(buffer, 0)
     | let _: USize =>
       try
         _parse(buffer)?
@@ -97,9 +97,9 @@ primitive _RespParser
     Format: $<length>\r\n<data>\r\n  or  $-1\r\n for null.
     Also used for RESP3 bulk error (!) and verbatim string (=).
     """
-    match _line_size(buffer, offset)
+    match \exhaustive\ _line_size(buffer, offset)
     | let header_size: USize =>
-      match _read_line_as_i64(buffer, offset + 1, (offset + header_size) - 2)
+      match \exhaustive\ _read_line_as_i64(buffer, offset + 1, (offset + header_size) - 2)
       | let len: I64 =>
         if len == -1 then
           return header_size
@@ -127,9 +127,9 @@ primitive _RespParser
     Format: *<count>\r\n<element>...<element>  or  *-1\r\n for null.
     Also used for RESP3 set (~) and push (>).
     """
-    match _line_size(buffer, offset)
+    match \exhaustive\ _line_size(buffer, offset)
     | let header_size: USize =>
-      match _read_line_as_i64(
+      match \exhaustive\ _read_line_as_i64(
         buffer, offset + 1, (offset + header_size) - 2)
       | let count: I64 =>
         if count == -1 then
@@ -142,7 +142,7 @@ primitive _RespParser
         var total = header_size
         var i: I64 = 0
         while i < count do
-          match _complete_size(buffer, offset + total)
+          match \exhaustive\ _complete_size(buffer, offset + total)
           | let elem_size: USize => total = total + elem_size
           | None => return None
           | let m: RespMalformed => return m
@@ -163,7 +163,7 @@ primitive _RespParser
     Format: %<count>\r\n<key><value>...<key><value>  or  %-1\r\n for null.
     Count is the number of key-value pairs; total elements = count * 2.
     """
-    match _line_size(buffer, offset)
+    match \exhaustive\ _line_size(buffer, offset)
     | let header_size: USize =>
       match _read_line_as_i64(
         buffer, offset + 1, (offset + header_size) - 2)
@@ -180,7 +180,7 @@ primitive _RespParser
         var total = header_size
         var i: I64 = 0
         while i < num_elements do
-          match _complete_size(buffer, offset + total)
+          match \exhaustive\ _complete_size(buffer, offset + total)
           | let elem_size: USize => total = total + elem_size
           | None => return None
           | let m: RespMalformed => return m

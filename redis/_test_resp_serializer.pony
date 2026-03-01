@@ -511,7 +511,7 @@ class \nodoc\ iso _TestRespSerializerCommandRoundtrip is Property1[Array[ByteSeq
       while i < command.size() do
         match arr.values(i)?
         | let bs: RespBulkString =>
-          let expected: Array[U8] val = match command(i)?
+          let expected: Array[U8] val = match \exhaustive\ command(i)?
           | let s: String val =>
             recover val
               let a = Array[U8](s.size())
