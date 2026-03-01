@@ -10,7 +10,7 @@ primitive _ByteSeqString
   Convert a ByteSeq to a String for test assertions.
   """
   fun apply(bs: ByteSeq): String =>
-    match bs
+    match \exhaustive\ bs
     | let s: String val => s
     | let a: Array[U8] val => String.from_array(a)
     end

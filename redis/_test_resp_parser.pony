@@ -20,7 +20,7 @@ class \nodoc\ iso _TestRespParserRoundtrip is Property1[RespValue]
     let bytes = _TestRespSerializer(original)
     let buffer: Reader = Reader
     buffer.append(bytes)
-    match _RespParser(buffer)
+    match \exhaustive\ _RespParser(buffer)
     | let parsed: RespValue =>
       h.assert_true(
         _RespValueEq(original, parsed),
@@ -76,7 +76,7 @@ class \nodoc\ iso _TestRespParserIncompleteReturnsNone is Property1[RespValue]
       end
       let buffer: Reader = Reader
       buffer.append(prefix)
-      match _RespParser(buffer)
+      match \exhaustive\ _RespParser(buffer)
       | let _: RespValue =>
         // A shorter prefix parsing as a valid value is only acceptable if
         // the value is a proper subset (e.g., nested arrays where a prefix
@@ -453,7 +453,7 @@ class \nodoc\ iso _TestRespParserIntegerOverflow is UnitTest
     // (returns None because the buffer lacks the data bytes, not RespMalformed)
     let max_buf: Reader = Reader
     max_buf.append(_build_header('$', I64.max_value().string()))
-    match _RespParser(max_buf)
+    match \exhaustive\ _RespParser(max_buf)
     | None => None
     | let m: RespMalformed =>
       h.fail("I64.max as bulk string length should not be malformed: "

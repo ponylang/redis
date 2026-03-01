@@ -1831,7 +1831,7 @@ class \nodoc\ iso _TestBuildHelloCommand is UnitTest
     _assert_byteseq(h, "secret", cmd3(4)?)
 
   fun _assert_byteseq(h: TestHelper, expected: String, actual: ByteSeq) =>
-    match actual
+    match \exhaustive\ actual
     | let s: String val =>
       h.assert_eq[String](expected, s)
     | let a: Array[U8] val =>
@@ -1858,7 +1858,7 @@ class \nodoc\ iso _TestBuildAuthCommand is UnitTest
     _assert_byteseq(h, "secret", cmd2(2)?)
 
   fun _assert_byteseq(h: TestHelper, expected: String, actual: ByteSeq) =>
-    match actual
+    match \exhaustive\ actual
     | let s: String val =>
       h.assert_eq[String](expected, s)
     | let a: Array[U8] val =>
