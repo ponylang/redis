@@ -6,7 +6,7 @@
 make                    # build and run all tests (requires Redis running)
 make unit-tests         # run unit tests only (no Redis needed)
 make integration-tests  # run integration tests only (requires Redis)
-make build-examples     # build example programs
+make examples           # build example programs
 make start-redis        # start plaintext, SSL, and RESP2-only Redis in Docker
 make stop-redis         # stop and remove all Redis containers
 make clean              # clean build artifacts

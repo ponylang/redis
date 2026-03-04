@@ -59,4 +59,4 @@ jobs:
           REDIS_RESP2_HOST: redis-resp2
           REDIS_RESP2_PORT: 6379
       - name: Build examples
-        run: make build-examples config=debug ssl=libressl
+        run: make examples config=debug ssl=libressl

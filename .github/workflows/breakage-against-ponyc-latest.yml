@@ -50,7 +50,7 @@ jobs:
           REDIS_RESP2_HOST: redis-resp2
           REDIS_RESP2_PORT: 6379
       - name: Build examples
-        run: make build-examples config=debug ssl=libressl
+        run: make examples config=debug ssl=libressl
       - name: Send alert on failure
         if: ${{ failure() }}
         uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5
