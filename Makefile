@@ -48,6 +48,9 @@ test: unit-tests integration-tests examples
 unit-tests: $(tests_binary)
 	$^ --exclude=integration/ --sequential
 
+test-one: $(tests_binary)
+	$^ --only="$(t)"
+
 integration-tests: $(tests_binary)
 	$^ --only=integration/ --sequential
 
@@ -93,4 +96,4 @@ all: test
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-.PHONY: all examples clean docs integration-tests start-redis stop-redis TAGS test unit-tests
+.PHONY: all examples clean docs integration-tests start-redis stop-redis TAGS test unit-tests test-one
