@@ -28,7 +28,9 @@ actor Client is (SessionStatusNotify & ResultReceiver)
       ["HSET"; "_resp3_example"; "name"; "Pony"; "version"; "0.60"]
     session.execute(cmd, this)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _out.print("Failed to connect.")
 
   be redis_response(session: Session, response: RespValue) =>

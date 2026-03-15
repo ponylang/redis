@@ -51,7 +51,9 @@ actor \nodoc\ _ConnectAndReadyNotify is SessionStatusNotify
     _done = true
     _h.complete(true)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -140,7 +142,9 @@ actor \nodoc\ _SetAndGetClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -175,7 +179,9 @@ actor \nodoc\ _ConnectionFailureNotify is SessionStatusNotify
   new create(h: TestHelper) =>
     _h = h
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _done = true
     _h.complete(true)
 
@@ -285,7 +291,9 @@ actor \nodoc\ _ExecuteAfterCloseClient is
     _h.fail("Should not have received a response")
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -380,7 +388,9 @@ actor \nodoc\ _MultipleCommandsClient is
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -480,7 +490,9 @@ actor \nodoc\ _PipelineClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -583,7 +595,9 @@ actor \nodoc\ _PipelineMixedClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -659,7 +673,9 @@ actor \nodoc\ _PipelineCloseClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(false)
     end
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -709,7 +725,9 @@ actor \nodoc\ _ServerErrorClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -798,7 +816,9 @@ actor \nodoc\ _PubSubClient is
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -895,7 +915,9 @@ actor \nodoc\ _PubSubPatternClient is
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -967,7 +989,9 @@ actor \nodoc\ _ExecuteWhileSubscribedClient is
     _h.fail("Should not have received a response while subscribed")
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -1050,7 +1074,9 @@ actor \nodoc\ _PubSubBackToReadyClient is
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -1168,7 +1194,9 @@ actor \nodoc\ _PipelineDrainClient is
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -1211,7 +1239,9 @@ actor \nodoc\ _SSLConnectionFailureNotify is SessionStatusNotify
   new create(h: TestHelper) =>
     _h = h
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _done = true
     _h.complete(true)
 
@@ -1260,7 +1290,9 @@ actor \nodoc\ _SSLConnectAndReadyNotify is SessionStatusNotify
     _done = true
     _h.complete(true)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("SSL connection failed")
     _h.complete(false)
 
@@ -1356,7 +1388,9 @@ actor \nodoc\ _SSLSetAndGetClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("SSL connection failed")
     _h.complete(false)
 
@@ -1394,7 +1428,9 @@ actor \nodoc\ _Resp3ConnectAndReadyNotify is SessionStatusNotify
     _done = true
     _h.complete(true)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -1484,7 +1520,9 @@ actor \nodoc\ _Resp3SetAndGetClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -1575,7 +1613,9 @@ actor \nodoc\ _Resp3FallbackClient is (SessionStatusNotify & ResultReceiver)
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection to RESP2-only server failed")
     _h.complete(false)
 
@@ -1653,7 +1693,9 @@ actor \nodoc\ _CommandApiSetAndGetClient is
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection failed")
     _h.complete(false)
 
@@ -1783,7 +1825,9 @@ actor \nodoc\ _BackpressureOverflowClient is
       _h.complete(false)
     end
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _h.fail("Connection to fake server failed")
     _h.complete(false)
 

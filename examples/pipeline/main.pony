@@ -40,7 +40,9 @@ actor Client is (SessionStatusNotify & ResultReceiver)
       session.execute(cmd, this)
     end
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _out.print("Failed to connect.")
 
   be redis_response(session: Session, response: RespValue) =>

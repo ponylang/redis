@@ -116,8 +116,13 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
   fun ref _on_connected() =>
     state.on_connected(this)
 
-  fun ref _on_connection_failure() =>
-    state.on_failure(this)
+  fun ref _on_connection_failure(reason: lori.ConnectionFailureReason) =>
+    let r: ConnectionFailureReason = match \exhaustive\ reason
+    | let _: lori.ConnectionFailedDNS => ConnectionFailedDNS
+    | let _: lori.ConnectionFailedTCP => ConnectionFailedTCP
+    | let _: lori.ConnectionFailedSSL => ConnectionFailedSSL
+    end
+    state.on_failure(this, r)
 
   fun ref _on_received(data: Array[U8] iso) =>
     state.on_received(this, consume data)
@@ -146,7 +151,7 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
 
 interface _SessionState
   fun on_connected(s: Session ref)
-  fun on_failure(s: Session ref)
+  fun on_failure(s: Session ref, reason: ConnectionFailureReason)
   fun ref on_received(s: Session ref, data: Array[U8] iso)
   fun ref on_closed(s: Session ref)
   fun ref on_response(s: Session ref, response: RespValue)
@@ -175,7 +180,7 @@ trait _ClosedState is _SessionState
   fun on_connected(s: Session ref) =>
     _IllegalState()
 
-  fun on_failure(s: Session ref) =>
+  fun on_failure(s: Session ref, reason: ConnectionFailureReason) =>
     _IllegalState()
 
   fun ref on_received(s: Session ref, data: Array[U8] iso) =>
@@ -216,7 +221,7 @@ trait _ConnectedState is _SessionState
   fun on_connected(s: Session ref) =>
     _IllegalState()
 
-  fun on_failure(s: Session ref) =>
+  fun on_failure(s: Session ref, reason: ConnectionFailureReason) =>
     _IllegalState()
 
   fun ref on_received(s: Session ref, data: Array[U8] iso) =>
@@ -327,9 +332,9 @@ class ref _SessionUnopened is
       end
     end
 
-  fun on_failure(s: Session ref) =>
+  fun on_failure(s: Session ref, reason: ConnectionFailureReason) =>
     s.state = _SessionClosed
-    _notify.redis_session_connection_failed(s)
+    _notify.redis_session_connection_failed(s, reason)
 
   fun ref on_received(s: Session ref, data: Array[U8] iso) =>
     _IllegalState()

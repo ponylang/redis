@@ -24,7 +24,9 @@ actor Client is (SessionStatusNotify & ResultReceiver)
     _out.print("Connected and ready.")
     session.execute(RedisString.set("hello", "world"), this)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _out.print("Failed to connect.")
 
   be redis_response(session: Session, response: RespValue) =>

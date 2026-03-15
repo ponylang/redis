@@ -12,10 +12,13 @@ interface tag SessionStatusNotify
     """
     None
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     """
-    Called when the TCP connection to the server fails. The session is
-    terminal after this callback.
+    Called when the connection to the server fails. The `reason` identifies
+    the failure stage: DNS resolution, TCP connection, or SSL/TLS handshake.
+    The session is terminal after this callback.
     """
     None
 

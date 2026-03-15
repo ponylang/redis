@@ -48,7 +48,9 @@ actor Client is (SessionStatusNotify & ResultReceiver)
     let cmd: Array[ByteSeq] val = ["PING"]
     session.execute(cmd, this)
 
-  be redis_session_connection_failed(session: Session) =>
+  be redis_session_connection_failed(session: Session,
+    reason: ConnectionFailureReason)
+  =>
     _out.print("Failed to connect (TLS handshake or TCP failure).")
 
   be redis_response(session: Session, response: RespValue) =>

@@ -25,7 +25,7 @@ make stop-redis
 
 ## Dependencies
 
-- `ponylang/lori` (0.8.1) — TCP networking (transitively depends on `ponylang/ssl`, hence the `ssl=` build flag)
+- `ponylang/lori` (0.11.0) — TCP networking (transitively depends on `ponylang/ssl`, hence the `ssl=` build flag)
 
 ## Architecture
 
@@ -43,13 +43,14 @@ Package: `redis`
 
 - `Session` (actor in `session.pony`): Main entry point. Manages connection lifecycle and pub/sub via a state machine. Implements `lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver`. All state machine classes (`_SessionUnopened`, `_SessionNegotiating`, `_SessionConnected`, `_SessionReady`, `_SessionSubscribed`, `_SessionClosed`) are in `session.pony`, following the postgres pattern.
 - `ConnectInfo` (in `connect_info.pony`): Connection configuration (host, port, optional password, SSL mode, optional username, protocol version, send buffer limit).
-- `SessionStatusNotify` (in `session_status_notify.pony`): Lifecycle callback interface. All callbacks have default no-op implementations. Callbacks: `redis_session_connected`, `redis_session_connection_failed`, `redis_session_ready`, `redis_session_authentication_failed`, `redis_session_throttled`, `redis_session_unthrottled`, `redis_session_closed`.
+- `SessionStatusNotify` (in `session_status_notify.pony`): Lifecycle callback interface. All callbacks have default no-op implementations. Callbacks: `redis_session_connected`, `redis_session_connection_failed(session, reason)`, `redis_session_ready`, `redis_session_authentication_failed`, `redis_session_throttled`, `redis_session_unthrottled`, `redis_session_closed`.
 - `ResultReceiver` (in `result_receiver.pony`): Command response callback interface. Callbacks: `redis_response`, `redis_command_failed`.
 - `SubscriptionNotify` (in `subscription_notify.pony`): Pub/sub callback interface. All callbacks have default no-op implementations. Callbacks: `redis_subscribed`, `redis_unsubscribed`, `redis_message`, `redis_psubscribed`, `redis_punsubscribed`, `redis_pmessage`.
 - `ClientError` (in `client_error.pony`): Client-side error trait with `SessionNotReady`, `SessionClosed`, `SessionConnectionLost`, `SessionProtocolError`, `SessionInSubscribedMode`, and `SessionBackpressureOverflow` primitives.
 - `_ResponseHandler` (in `_response_handler.pony`): Loops `_RespParser` over a `buffered.Reader`, routing `RespPush` to `on_push` and other `RespValue`s to `on_response`. Shuts down on `RespMalformed`.
 - `_BuildHelloCommand` / `_BuildAuthCommand` (primitives in `session.pony`): Build HELLO 3 and AUTH commands for protocol negotiation and authentication.
 - `_BufferedSend` (class val in `session.pony`): Serialized command buffered during backpressure. Holds wire-format bytes and an optional `_QueuedCommand` for response matching.
+- `ConnectionFailureReason` (type alias in `connection_failure_reason.pony`): `(ConnectionFailedDNS | ConnectionFailedTCP | ConnectionFailedSSL)`. Passed to `redis_session_connection_failed` to identify the failure stage.
 - `_IllegalState` / `_Unreachable` (in `_mort.pony`): Primitives for detecting impossible states.
 
 ### Command Builders
