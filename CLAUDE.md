@@ -25,7 +25,7 @@ make stop-redis
 
 ## Dependencies
 
-- `ponylang/lori` (0.11.0) — TCP networking (transitively depends on `ponylang/ssl`, hence the `ssl=` build flag)
+- `ponylang/lori` (0.12.0) — TCP networking (transitively depends on `ponylang/ssl`, hence the `ssl=` build flag)
 
 ## Architecture
 
@@ -50,7 +50,7 @@ Package: `redis`
 - `_ResponseHandler` (in `_response_handler.pony`): Loops `_RespParser` over a `buffered.Reader`, routing `RespPush` to `on_push` and other `RespValue`s to `on_response`. Shuts down on `RespMalformed`.
 - `_BuildHelloCommand` / `_BuildAuthCommand` (primitives in `session.pony`): Build HELLO 3 and AUTH commands for protocol negotiation and authentication.
 - `_BufferedSend` (class val in `session.pony`): Serialized command buffered during backpressure. Holds wire-format bytes and an optional `_QueuedCommand` for response matching.
-- `ConnectionFailureReason` (type alias in `connection_failure_reason.pony`): `(ConnectionFailedDNS | ConnectionFailedTCP | ConnectionFailedSSL)`. Passed to `redis_session_connection_failed` to identify the failure stage.
+- `ConnectionFailureReason` (type alias in `connection_failure_reason.pony`): `(ConnectionFailedDNS | ConnectionFailedTCP | ConnectionFailedSSL | ConnectionFailedTimeout)`. Passed to `redis_session_connection_failed` to identify the failure stage.
 - `_IllegalState` / `_Unreachable` (in `_mort.pony`): Primitives for detecting impossible states.
 
 ### Command Builders

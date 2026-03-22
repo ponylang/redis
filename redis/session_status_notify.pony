@@ -17,7 +17,8 @@ interface tag SessionStatusNotify
   =>
     """
     Called when the connection to the server fails. The `reason` identifies
-    the failure stage: DNS resolution, TCP connection, or SSL/TLS handshake.
+    the failure stage: DNS resolution, TCP connection, SSL/TLS handshake,
+    or connection timeout.
     The session is terminal after this callback.
     """
     None
