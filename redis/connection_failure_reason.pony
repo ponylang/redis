@@ -13,5 +13,13 @@ primitive ConnectionFailedSSL
   The SSL/TLS handshake failed before the connection was established.
   """
 
+primitive ConnectionFailedTimeout
+  """
+  The connection attempt timed out before completing.
+  """
+
 type ConnectionFailureReason is
-  (ConnectionFailedDNS | ConnectionFailedTCP | ConnectionFailedSSL)
+  ( ConnectionFailedDNS
+  | ConnectionFailedTCP
+  | ConnectionFailedSSL
+  | ConnectionFailedTimeout )
