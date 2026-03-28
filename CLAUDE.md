@@ -25,7 +25,7 @@ make stop-redis
 
 ## Dependencies
 
-- `ponylang/lori` (0.12.0) — TCP networking (transitively depends on `ponylang/ssl`, hence the `ssl=` build flag)
+- `ponylang/lori` (0.13.0) — TCP networking (transitively depends on `ponylang/ssl`, hence the `ssl=` build flag)
 
 ## Architecture
 
