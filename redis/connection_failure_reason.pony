@@ -18,8 +18,15 @@ primitive ConnectionFailedTimeout
   The connection attempt timed out before completing.
   """
 
+primitive ConnectionFailedTimerError
+  """
+  The connection was aborted because the connect timer's ASIO event
+  subscription failed.
+  """
+
 type ConnectionFailureReason is
   ( ConnectionFailedDNS
   | ConnectionFailedTCP
   | ConnectionFailedSSL
-  | ConnectionFailedTimeout )
+  | ConnectionFailedTimeout
+  | ConnectionFailedTimerError )
