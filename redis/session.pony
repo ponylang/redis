@@ -138,6 +138,12 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
   fun ref _on_unthrottled() =>
     state.on_unthrottled(this)
 
+  fun ref _on_idle_timer_failure() =>
+    _Unreachable()
+
+  fun ref _on_timer_failure() =>
+    _Unreachable()
+
   be _flush_backpressure() =>
     """
     Deferred flush of the backpressure send buffer. Triggered by
