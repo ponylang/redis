@@ -130,7 +130,7 @@ Do not write tests that connect with SSL to a plaintext Redis server. The TLS Cl
 
 ### CI
 
-Both `pr.yml` and `breakage-against-ponyc-latest.yml` use the `shared-docker-ci-standard-builder-with-libressl-4.2.0` image (for ssl support) and three Redis service containers: `redis` (plaintext, Redis 7), `redis-ssl` (TLS via `ghcr.io/ponylang/redis-ci-redis-ssl:latest`), and `redis-resp2` (Redis 5, RESP2-only for HELLO fallback testing). Integration tests receive `REDIS_HOST=redis`, `REDIS_PORT=6379`, `REDIS_SSL_HOST=redis-ssl`, `REDIS_SSL_PORT=6379`, `REDIS_RESP2_HOST=redis-resp2`, and `REDIS_RESP2_PORT=6379`. All make targets pass `ssl=libressl`.
+Both `pr.yml` and `breakage-against-ponyc-latest.yml` use the `shared-docker-ci-standard-builder-with-libressl-4.2.1` image (for ssl support) and three Redis service containers: `redis` (plaintext, Redis 7), `redis-ssl` (TLS via `ghcr.io/ponylang/redis-ci-redis-ssl:latest`), and `redis-resp2` (Redis 5, RESP2-only for HELLO fallback testing). Integration tests receive `REDIS_HOST=redis`, `REDIS_PORT=6379`, `REDIS_SSL_HOST=redis-ssl`, `REDIS_SSL_PORT=6379`, `REDIS_RESP2_HOST=redis-resp2`, and `REDIS_RESP2_PORT=6379`. All make targets pass `ssl=libressl`.
 
 The `redis-ssl` CI image is built via `build-ci-image.yml` (manually triggered `workflow_dispatch`). Source: `.ci-dockerfiles/redis-ssl/Dockerfile`. Build locally with `.ci-dockerfiles/redis-ssl/build-and-push.bash`.
 
