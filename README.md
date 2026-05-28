@@ -8,7 +8,7 @@ This library is under active development. The API is not yet stable.
 
 ## Installation
 
-* Requires ponyc 0.63.1 or later
+* Requires ponyc 0.64.0 or later
 * Install [corral](https://github.com/ponylang/corral)
 * `corral add github.com/ponylang/redis.git --version 0.0.0`
 * `corral fetch` to fetch your dependencies
