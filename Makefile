@@ -46,13 +46,13 @@ EXAMPLES_BINARIES := $(addprefix $(BUILD_DIR)/,$(EXAMPLES))
 test: unit-tests integration-tests examples
 
 unit-tests: $(tests_binary)
-	$^ --exclude=integration/ --sequential
+	$^ --exclude=integration/ --sequential --shuffle
 
 test-one: $(tests_binary)
 	$^ --only="$(t)"
 
 integration-tests: $(tests_binary)
-	$^ --only=integration/ --sequential
+	$^ --only=integration/ --sequential --shuffle
 
 start-redis:
 	@docker run --name redis -p 6379:6379 -d redis:7
