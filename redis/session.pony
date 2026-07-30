@@ -126,8 +126,9 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
     end
     state.on_failure(this, r)
 
-  fun ref _on_received(data: Array[U8] iso) =>
+  fun ref _on_received(data: Array[U8] iso): lori.ReadAction =>
     state.on_received(this, consume data)
+    lori.KeepReading
 
   fun ref _on_closed() =>
     state.on_closed(this)
