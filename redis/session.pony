@@ -313,7 +313,7 @@ class ref _SessionUnopened is
       let cmd = _BuildHelloCommand(_connect_info)
       let data = _RespSerializer(cmd)
       match s._connection().send(data)
-      | let _: lori.SendToken =>
+      | lori.SendAccepted =>
         s.state = _SessionNegotiating(_notify, _connect_info)
       else
         s._connection().close()
@@ -326,7 +326,7 @@ class ref _SessionUnopened is
         let cmd = _BuildAuthCommand(_connect_info.username, password)
         let data = _RespSerializer(cmd)
         match s._connection().send(data)
-        | let _: lori.SendToken =>
+        | lori.SendAccepted =>
           s.state = _SessionConnected(_notify,
             _connect_info.send_buffer_limit)
         else
@@ -395,7 +395,7 @@ class ref _SessionNegotiating is
         let cmd = _BuildAuthCommand(_connect_info.username, password)
         let data = _RespSerializer(cmd)
         match s._connection().send(data)
-        | let _: lori.SendToken =>
+        | lori.SendAccepted =>
           s.state = _SessionConnected.from_negotiating(_notify, _readbuf,
             _connect_info.send_buffer_limit)
         else
@@ -584,7 +584,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     else
       let data = _RespSerializer(command)
       match \exhaustive\ s._connection().send(data)
-      | let _: lori.SendToken =>
+      | lori.SendAccepted =>
         _pending.push(_QueuedCommand(command, receiver))
       | lori.SendErrorNotWriteable =>
         _throttled = true
@@ -643,7 +643,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
       try
         let buffered = _send_buffer.shift()?
         match \exhaustive\ s._connection().send(buffered.data)
-        | let _: lori.SendToken =>
+        | lori.SendAccepted =>
           match buffered.queued
           | let qc: _QueuedCommand => _pending.push(qc)
           end
@@ -682,7 +682,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     else
       let data = _RespSerializer(cmd)
       match \exhaustive\ s._connection().send(data)
-      | let _: lori.SendToken => None
+      | lori.SendAccepted => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(_BufferedSend(data))
@@ -710,7 +710,7 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     else
       let data = _RespSerializer(cmd)
       match \exhaustive\ s._connection().send(data)
-      | let _: lori.SendToken => None
+      | lori.SendAccepted => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(_BufferedSend(data))
@@ -900,7 +900,7 @@ class ref _SessionSubscribed is _ConnectedState
     else
       let data = _RespSerializer(cmd)
       match \exhaustive\ s._connection().send(data)
-      | let _: lori.SendToken => None
+      | lori.SendAccepted => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(_BufferedSend(data))
@@ -927,7 +927,7 @@ class ref _SessionSubscribed is _ConnectedState
     else
       let data = _RespSerializer(cmd)
       match \exhaustive\ s._connection().send(data)
-      | let _: lori.SendToken => None
+      | lori.SendAccepted => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(_BufferedSend(data))
@@ -949,7 +949,7 @@ class ref _SessionSubscribed is _ConnectedState
     else
       let data = _RespSerializer(cmd)
       match \exhaustive\ s._connection().send(data)
-      | let _: lori.SendToken => None
+      | lori.SendAccepted => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(_BufferedSend(data))
@@ -971,7 +971,7 @@ class ref _SessionSubscribed is _ConnectedState
     else
       let data = _RespSerializer(cmd)
       match \exhaustive\ s._connection().send(data)
-      | let _: lori.SendToken => None
+      | lori.SendAccepted => None
       | lori.SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(_BufferedSend(data))
@@ -995,7 +995,7 @@ class ref _SessionSubscribed is _ConnectedState
       try
         let buffered = _send_buffer.shift()?
         match \exhaustive\ s._connection().send(buffered.data)
-        | let _: lori.SendToken =>
+        | lori.SendAccepted =>
           match buffered.queued
           | let qc: _QueuedCommand => _pending.push(qc)
           end
