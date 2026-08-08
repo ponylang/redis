@@ -50,8 +50,11 @@ class val ConnectInfo
   let protocol: ProtocolVersion
   let send_buffer_limit: USize
 
-  new val create(auth': lori.TCPConnectAuth, host': String,
-    port': String = "6379", password': (String | None) = None,
+  new val create(
+    auth': lori.TCPConnectAuth,
+    host': String,
+    port': String = "6379",
+    password': (String | None) = None,
     ssl_mode': SSLMode = SSLDisabled,
     username': (String | None) = None,
     protocol': ProtocolVersion = Resp2,

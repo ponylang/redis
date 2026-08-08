@@ -32,25 +32,26 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
 
   new create(connect_info': ConnectInfo, notify': SessionStatusNotify) =>
     state = _SessionUnopened(notify', connect_info')
-    _tcp_connection = match \exhaustive\ connect_info'.ssl_mode
-    | SSLDisabled =>
-      lori.TCPConnection.client(
-        connect_info'.auth,
-        connect_info'.host,
-        connect_info'.port,
-        "",
-        this,
-        this)
-    | let ssl: SSLRequired =>
-      lori.TCPConnection.ssl_client(
-        connect_info'.auth,
-        ssl.ctx,
-        connect_info'.host,
-        connect_info'.port,
-        "",
-        this,
-        this)
-    end
+    _tcp_connection =
+      match \exhaustive\ connect_info'.ssl_mode
+      | SSLDisabled =>
+        lori.TCPConnection.client(
+          connect_info'.auth,
+          connect_info'.host,
+          connect_info'.port,
+          "",
+          this,
+          this)
+      | let ssl: SSLRequired =>
+        lori.TCPConnection.ssl_client(
+          connect_info'.auth,
+          ssl.ctx,
+          connect_info'.host,
+          connect_info'.port,
+          "",
+          this,
+          this)
+      end
 
   be execute(command: Array[ByteSeq] val, receiver: ResultReceiver) =>
     """
@@ -117,13 +118,16 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
     state.on_connected(this)
 
   fun ref _on_connection_failure(reason: lori.ConnectionFailureReason) =>
-    let r: ConnectionFailureReason = match \exhaustive\ reason
-    | let _: lori.ConnectionFailedDNS => ConnectionFailedDNS
-    | let _: lori.ConnectionFailedTCP => ConnectionFailedTCP
-    | let _: lori.ConnectionFailedSSL => ConnectionFailedSSL
-    | let _: lori.ConnectionFailedTimeout => ConnectionFailedTimeout
-    | let _: lori.ConnectionFailedTimerError => ConnectionFailedTimerError
-    end
+    let r: ConnectionFailureReason =
+      match \exhaustive\ reason
+      | let _: lori.ConnectionFailedDNS => ConnectionFailedDNS
+      | let _: lori.ConnectionFailedTCP => ConnectionFailedTCP
+      | let _: lori.ConnectionFailedSSL => ConnectionFailedSSL
+      | let _: lori.ConnectionFailedTimeout =>
+        ConnectionFailedTimeout
+      | let _: lori.ConnectionFailedTimerError =>
+        ConnectionFailedTimerError
+      end
     state.on_failure(this, r)
 
   fun ref _on_received(data: Array[U8] iso): lori.ReadAction =>
@@ -157,30 +161,49 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
     _tcp_connection
 
 // State machine interface
-
 interface _SessionState
   fun on_connected(s: Session ref)
+
   fun on_failure(s: Session ref, reason: ConnectionFailureReason)
+
   fun ref on_received(s: Session ref, data: Array[U8] iso)
+
   fun ref on_closed(s: Session ref)
+
   fun ref on_response(s: Session ref, response: RespValue)
+
   fun ref on_push(s: Session ref, push: RespPush)
-  fun ref execute(s: Session ref, command: Array[ByteSeq] val,
+
+  fun ref execute(
+    s: Session ref,
+    command: Array[ByteSeq] val,
     receiver: ResultReceiver)
+
   fun ref close(s: Session ref)
+
   fun ref shutdown(s: Session ref, reason: ClientError)
-  fun ref subscribe(s: Session ref, channels: Array[String] val,
+
+  fun ref subscribe(
+    s: Session ref,
+    channels: Array[String] val,
     sub_notify: SubscriptionNotify)
+
   fun ref unsubscribe(s: Session ref, channels: Array[String] val)
-  fun ref psubscribe(s: Session ref, patterns: Array[String] val,
+
+  fun ref psubscribe(
+    s: Session ref,
+    patterns: Array[String] val,
     sub_notify: SubscriptionNotify)
+
   fun ref punsubscribe(s: Session ref, patterns: Array[String] val)
+
   fun ref on_throttled(s: Session ref)
+
   fun ref on_unthrottled(s: Session ref)
+
   fun ref flush_send_buffer(s: Session ref)
 
 // Trait composition
-
 trait _ClosedState is _SessionState
   """
   Terminal state mixin. All operations are either illegal (protocol
@@ -203,7 +226,9 @@ trait _ClosedState is _SessionState
   fun ref on_response(s: Session ref, response: RespValue) =>
     _IllegalState()
 
-  fun ref execute(s: Session ref, command: Array[ByteSeq] val,
+  fun ref execute(
+    s: Session ref,
+    command: Array[ByteSeq] val,
     receiver: ResultReceiver)
   =>
     receiver.redis_command_failed(s, command, SessionClosed)
@@ -245,7 +270,9 @@ trait _NotReadyForCommands is _SessionState
   Mixin for states that reject command execution because the session
   is not yet ready.
   """
-  fun ref execute(s: Session ref, command: Array[ByteSeq] val,
+  fun ref execute(
+    s: Session ref,
+    command: Array[ByteSeq] val,
     receiver: ResultReceiver)
   =>
     receiver.redis_command_failed(s, command, SessionNotReady)
@@ -265,7 +292,9 @@ trait _NotSubscribed is _SessionState
   fun ref on_push(s: Session ref, push: RespPush) =>
     None
 
-  fun ref subscribe(s: Session ref, channels: Array[String] val,
+  fun ref subscribe(
+    s: Session ref,
+    channels: Array[String] val,
     sub_notify: SubscriptionNotify)
   =>
     None
@@ -273,7 +302,9 @@ trait _NotSubscribed is _SessionState
   fun ref unsubscribe(s: Session ref, channels: Array[String] val) =>
     None
 
-  fun ref psubscribe(s: Session ref, patterns: Array[String] val,
+  fun ref psubscribe(
+    s: Session ref,
+    patterns: Array[String] val,
     sub_notify: SubscriptionNotify)
   =>
     None
@@ -293,7 +324,6 @@ trait _NotThrottleable is _SessionState
   fun ref flush_send_buffer(s: Session ref) => None
 
 // Session states
-
 class ref _SessionUnopened is
   (_NotReadyForCommands & _NotSubscribed & _NotThrottleable)
   """
@@ -327,16 +357,22 @@ class ref _SessionUnopened is
         let data = _RespSerializer(cmd)
         match s._connection().send(data)
         | lori.SendAccepted =>
-          s.state = _SessionConnected(_notify,
-            _connect_info.send_buffer_limit)
+          s.state =
+            _SessionConnected(
+              _notify,
+              _connect_info.send_buffer_limit
+            )
         else
           s._connection().close()
           s.state = _SessionClosed
           _notify.redis_session_closed(s)
         end
       | None =>
-        s.state = _SessionReady(_notify,
-          _connect_info.send_buffer_limit)
+        s.state =
+          _SessionReady(
+            _notify,
+            _connect_info.send_buffer_limit
+          )
         _notify.redis_session_ready(s)
       end
     end
@@ -385,8 +421,12 @@ class ref _SessionNegotiating is
   fun ref on_response(s: Session ref, response: RespValue) =>
     match response
     | let _: RespMap =>
-      s.state = _SessionReady.from_connected(_notify, _readbuf,
-        _connect_info.send_buffer_limit)
+      s.state =
+        _SessionReady.from_connected(
+          _notify,
+          _readbuf,
+          _connect_info.send_buffer_limit
+        )
       _notify.redis_session_ready(s)
     | let err: RespError =>
       // HELLO not supported — fall back to RESP2.
@@ -396,14 +436,22 @@ class ref _SessionNegotiating is
         let data = _RespSerializer(cmd)
         match s._connection().send(data)
         | lori.SendAccepted =>
-          s.state = _SessionConnected.from_negotiating(_notify, _readbuf,
-            _connect_info.send_buffer_limit)
+          s.state =
+            _SessionConnected.from_negotiating(
+              _notify,
+              _readbuf,
+              _connect_info.send_buffer_limit
+            )
         else
           shutdown(s, SessionConnectionLost)
         end
       | None =>
-        s.state = _SessionReady.from_connected(_notify, _readbuf,
-          _connect_info.send_buffer_limit)
+        s.state =
+          _SessionReady.from_connected(
+            _notify,
+            _readbuf,
+            _connect_info.send_buffer_limit
+          )
         _notify.redis_session_ready(s)
       end
     else
@@ -445,14 +493,17 @@ class ref _SessionConnected is
   let _readbuf: Reader
   let _send_buffer_limit: USize
 
-  new ref create(notify': SessionStatusNotify,
+  new ref create(
+    notify': SessionStatusNotify,
     send_buffer_limit': USize)
   =>
     _notify = notify'
     _readbuf = Reader
     _send_buffer_limit = send_buffer_limit'
 
-  new ref from_negotiating(notify': SessionStatusNotify, readbuf': Reader,
+  new ref from_negotiating(
+    notify': SessionStatusNotify,
+    readbuf': Reader,
     send_buffer_limit': USize)
   =>
     _notify = notify'
@@ -462,8 +513,10 @@ class ref _SessionConnected is
   fun ref on_response(s: Session ref, response: RespValue) =>
     match \exhaustive\ response
     | let ok: RespSimpleString if ok.value == "OK" =>
-      s.state = _SessionReady.from_connected(_notify, _readbuf,
-        _send_buffer_limit)
+      s.state =
+        _SessionReady.from_connected(
+          _notify, _readbuf, _send_buffer_limit
+        )
       _notify.redis_session_ready(s)
     | let err: RespError =>
       _notify.redis_session_authentication_failed(s, err.message)
@@ -500,7 +553,8 @@ class val _QueuedCommand
   let command: Array[ByteSeq] val
   let receiver: ResultReceiver
 
-  new val create(command': Array[ByteSeq] val,
+  new val create(
+    command': Array[ByteSeq] val,
     receiver': ResultReceiver)
   =>
     command = command'
@@ -516,7 +570,8 @@ class val _BufferedSend
   let data: Array[U8] val
   let queued: (_QueuedCommand | None)
 
-  new val create(data': Array[U8] val,
+  new val create(
+    data': Array[U8] val,
     queued': (_QueuedCommand | None) = None)
   =>
     data = data'
@@ -541,7 +596,8 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
   let _send_buffer: Array[_BufferedSend]
   let _send_buffer_limit: USize
 
-  new ref create(notify': SessionStatusNotify,
+  new ref create(
+    notify': SessionStatusNotify,
     send_buffer_limit': USize)
   =>
     _notify = notify'
@@ -550,7 +606,9 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     _send_buffer = Array[_BufferedSend]
     _send_buffer_limit = send_buffer_limit'
 
-  new ref from_connected(notify': SessionStatusNotify, readbuf': Reader,
+  new ref from_connected(
+    notify': SessionStatusNotify,
+    readbuf': Reader,
     send_buffer_limit': USize)
   =>
     _notify = notify'
@@ -559,8 +617,11 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     _send_buffer = Array[_BufferedSend]
     _send_buffer_limit = send_buffer_limit'
 
-  new ref from_subscribed(notify': SessionStatusNotify, readbuf': Reader,
-    throttled': Bool, send_buffer': Array[_BufferedSend],
+  new ref from_subscribed(
+    notify': SessionStatusNotify,
+    readbuf': Reader,
+    throttled': Bool,
+    send_buffer': Array[_BufferedSend],
     send_buffer_limit': USize)
   =>
     _notify = notify'
@@ -569,18 +630,24 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     _send_buffer = send_buffer'
     _send_buffer_limit = send_buffer_limit'
 
-  fun ref execute(s: Session ref, command: Array[ByteSeq] val,
+  fun ref execute(
+    s: Session ref,
+    command: Array[ByteSeq] val,
     receiver: ResultReceiver)
   =>
     if _throttled then
       if _send_buffer.size() >= _send_buffer_limit then
-        receiver.redis_command_failed(s, command,
-          SessionBackpressureOverflow)
+        receiver.redis_command_failed(
+          s, command, SessionBackpressureOverflow
+        )
         return
       end
       _send_buffer.push(
-        _BufferedSend(_RespSerializer(command),
-          _QueuedCommand(command, receiver)))
+        _BufferedSend(
+          _RespSerializer(command),
+          _QueuedCommand(command, receiver)
+        )
+      )
     else
       let data = _RespSerializer(command)
       match \exhaustive\ s._connection().send(data)
@@ -589,7 +656,8 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
       | lori.SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(
-          _BufferedSend(data, _QueuedCommand(command, receiver)))
+          _BufferedSend(data, _QueuedCommand(command, receiver))
+        )
         _notify.redis_session_throttled(s)
       | lori.SendErrorNotConnected =>
         receiver.redis_command_failed(s, command, SessionConnectionLost)
@@ -667,16 +735,19 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
   fun notify(): SessionStatusNotify =>
     _notify
 
-  fun ref subscribe(s: Session ref, channels: Array[String] val,
+  fun ref subscribe(
+    s: Session ref,
+    channels: Array[String] val,
     sub_notify: SubscriptionNotify)
   =>
     if channels.size() == 0 then return end
-    let cmd = recover val
-      let arr = Array[ByteSeq](channels.size() + 1)
-      arr.push("SUBSCRIBE")
-      for ch in channels.values() do arr.push(ch) end
-      arr
-    end
+    let cmd =
+      recover val
+        let arr = Array[ByteSeq](channels.size() + 1)
+        arr.push("SUBSCRIBE")
+        for ch in channels.values() do arr.push(ch) end
+        arr
+      end
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
@@ -692,19 +763,30 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
         return
       end
     end
-    s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify,
-      _throttled, _send_buffer, _send_buffer_limit)
+    s.state =
+      _SessionSubscribed(
+        _notify,
+        _readbuf,
+        _pending,
+        sub_notify,
+        _throttled,
+        _send_buffer,
+        _send_buffer_limit
+      )
 
-  fun ref psubscribe(s: Session ref, patterns: Array[String] val,
+  fun ref psubscribe(
+    s: Session ref,
+    patterns: Array[String] val,
     sub_notify: SubscriptionNotify)
   =>
     if patterns.size() == 0 then return end
-    let cmd = recover val
-      let arr = Array[ByteSeq](patterns.size() + 1)
-      arr.push("PSUBSCRIBE")
-      for pat in patterns.values() do arr.push(pat) end
-      arr
-    end
+    let cmd =
+      recover val
+        let arr = Array[ByteSeq](patterns.size() + 1)
+        arr.push("PSUBSCRIBE")
+        for pat in patterns.values() do arr.push(pat) end
+        arr
+      end
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
@@ -720,8 +802,16 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
         return
       end
     end
-    s.state = _SessionSubscribed(_notify, _readbuf, _pending, sub_notify,
-      _throttled, _send_buffer, _send_buffer_limit)
+    s.state =
+      _SessionSubscribed(
+        _notify,
+        _readbuf,
+        _pending,
+        sub_notify,
+        _throttled,
+        _send_buffer,
+        _send_buffer_limit
+      )
 
   fun ref _drain_pending(s: Session ref, reason: ClientError) =>
     for queued in _pending.values() do
@@ -760,9 +850,13 @@ class ref _SessionSubscribed is _ConnectedState
   let _send_buffer: Array[_BufferedSend]
   let _send_buffer_limit: USize
 
-  new ref create(notify': SessionStatusNotify, readbuf': Reader,
-    pending': Array[_QueuedCommand], sub_notify': SubscriptionNotify,
-    throttled': Bool, send_buffer': Array[_BufferedSend],
+  new ref create(
+    notify': SessionStatusNotify,
+    readbuf': Reader,
+    pending': Array[_QueuedCommand],
+    sub_notify': SubscriptionNotify,
+    throttled': Bool,
+    send_buffer': Array[_BufferedSend],
     send_buffer_limit': USize)
   =>
     _notify = notify'
@@ -773,7 +867,9 @@ class ref _SessionSubscribed is _ConnectedState
     _send_buffer = send_buffer'
     _send_buffer_limit = send_buffer_limit'
 
-  fun ref execute(s: Session ref, command: Array[ByteSeq] val,
+  fun ref execute(
+    s: Session ref,
+    command: Array[ByteSeq] val,
     receiver: ResultReceiver)
   =>
     receiver.redis_command_failed(s, command, SessionInSubscribedMode)
@@ -804,7 +900,8 @@ class ref _SessionSubscribed is _ConnectedState
       shutdown(s, SessionProtocolError)
     end
 
-  fun ref _dispatch_pubsub_values(s: Session ref,
+  fun ref _dispatch_pubsub_values(
+    s: Session ref,
     values: Array[RespValue] val)
   =>
     try
@@ -814,8 +911,9 @@ class ref _SessionSubscribed is _ConnectedState
         if msg_type == "subscribe" then
           match (values(1)?, values(2)?)
           | (let ch: RespBulkString, let cnt: RespInteger) =>
-            _sub_notify.redis_subscribed(s, String.from_array(ch.value),
-              cnt.value.usize())
+            _sub_notify.redis_subscribed(
+              s, String.from_array(ch.value), cnt.value.usize()
+            )
           else
             shutdown(s, SessionProtocolError)
           end
@@ -823,11 +921,18 @@ class ref _SessionSubscribed is _ConnectedState
           match (values(1)?, values(2)?)
           | (let ch: RespBulkString, let cnt: RespInteger) =>
             let count = cnt.value.usize()
-            _sub_notify.redis_unsubscribed(s, String.from_array(ch.value),
-              count)
+            _sub_notify.redis_unsubscribed(
+              s, String.from_array(ch.value), count
+            )
             if count == 0 then
-              s.state = _SessionReady.from_subscribed(_notify, _readbuf,
-                _throttled, _send_buffer, _send_buffer_limit)
+              s.state =
+                _SessionReady.from_subscribed(
+                  _notify,
+                  _readbuf,
+                  _throttled,
+                  _send_buffer,
+                  _send_buffer_limit
+                )
               _notify.redis_session_ready(s)
             end
           else
@@ -836,16 +941,18 @@ class ref _SessionSubscribed is _ConnectedState
         elseif msg_type == "message" then
           match (values(1)?, values(2)?)
           | (let ch: RespBulkString, let data_bs: RespBulkString) =>
-            _sub_notify.redis_message(s, String.from_array(ch.value),
-              data_bs.value)
+            _sub_notify.redis_message(
+              s, String.from_array(ch.value), data_bs.value
+            )
           else
             shutdown(s, SessionProtocolError)
           end
         elseif msg_type == "psubscribe" then
           match (values(1)?, values(2)?)
           | (let pat: RespBulkString, let cnt: RespInteger) =>
-            _sub_notify.redis_psubscribed(s, String.from_array(pat.value),
-              cnt.value.usize())
+            _sub_notify.redis_psubscribed(
+              s, String.from_array(pat.value), cnt.value.usize()
+            )
           else
             shutdown(s, SessionProtocolError)
           end
@@ -853,11 +960,18 @@ class ref _SessionSubscribed is _ConnectedState
           match (values(1)?, values(2)?)
           | (let pat: RespBulkString, let cnt: RespInteger) =>
             let count = cnt.value.usize()
-            _sub_notify.redis_punsubscribed(s, String.from_array(pat.value),
-              count)
+            _sub_notify.redis_punsubscribed(
+              s, String.from_array(pat.value), count
+            )
             if count == 0 then
-              s.state = _SessionReady.from_subscribed(_notify, _readbuf,
-                _throttled, _send_buffer, _send_buffer_limit)
+              s.state =
+                _SessionReady.from_subscribed(
+                  _notify,
+                  _readbuf,
+                  _throttled,
+                  _send_buffer,
+                  _send_buffer_limit
+                )
               _notify.redis_session_ready(s)
             end
           else
@@ -868,8 +982,12 @@ class ref _SessionSubscribed is _ConnectedState
           | (let pat: RespBulkString, let ch: RespBulkString,
             let data_bs: RespBulkString)
           =>
-            _sub_notify.redis_pmessage(s, String.from_array(pat.value),
-              String.from_array(ch.value), data_bs.value)
+            _sub_notify.redis_pmessage(
+              s,
+              String.from_array(pat.value),
+              String.from_array(ch.value),
+              data_bs.value
+            )
           else
             shutdown(s, SessionProtocolError)
           end
@@ -883,18 +1001,21 @@ class ref _SessionSubscribed is _ConnectedState
       shutdown(s, SessionProtocolError)
     end
 
-  fun ref subscribe(s: Session ref, channels: Array[String] val,
+  fun ref subscribe(
+    s: Session ref,
+    channels: Array[String] val,
     sub_notify: SubscriptionNotify)
   =>
     // sub_notify parameter is ignored — all messages go to _sub_notify
     // from the initial subscribe call.
     if channels.size() == 0 then return end
-    let cmd = recover val
-      let arr = Array[ByteSeq](channels.size() + 1)
-      arr.push("SUBSCRIBE")
-      for ch in channels.values() do arr.push(ch) end
-      arr
-    end
+    let cmd =
+      recover val
+        let arr = Array[ByteSeq](channels.size() + 1)
+        arr.push("SUBSCRIBE")
+        for ch in channels.values() do arr.push(ch) end
+        arr
+      end
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
@@ -910,18 +1031,21 @@ class ref _SessionSubscribed is _ConnectedState
       end
     end
 
-  fun ref psubscribe(s: Session ref, patterns: Array[String] val,
+  fun ref psubscribe(
+    s: Session ref,
+    patterns: Array[String] val,
     sub_notify: SubscriptionNotify)
   =>
     // sub_notify parameter is ignored — all messages go to _sub_notify
     // from the initial subscribe call.
     if patterns.size() == 0 then return end
-    let cmd = recover val
-      let arr = Array[ByteSeq](patterns.size() + 1)
-      arr.push("PSUBSCRIBE")
-      for pat in patterns.values() do arr.push(pat) end
-      arr
-    end
+    let cmd =
+      recover val
+        let arr = Array[ByteSeq](patterns.size() + 1)
+        arr.push("PSUBSCRIBE")
+        for pat in patterns.values() do arr.push(pat) end
+        arr
+      end
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
@@ -938,12 +1062,13 @@ class ref _SessionSubscribed is _ConnectedState
     end
 
   fun ref unsubscribe(s: Session ref, channels: Array[String] val) =>
-    let cmd = recover val
-      let arr = Array[ByteSeq](channels.size() + 1)
-      arr.push("UNSUBSCRIBE")
-      for ch in channels.values() do arr.push(ch) end
-      arr
-    end
+    let cmd =
+      recover val
+        let arr = Array[ByteSeq](channels.size() + 1)
+        arr.push("UNSUBSCRIBE")
+        for ch in channels.values() do arr.push(ch) end
+        arr
+      end
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
@@ -960,12 +1085,13 @@ class ref _SessionSubscribed is _ConnectedState
     end
 
   fun ref punsubscribe(s: Session ref, patterns: Array[String] val) =>
-    let cmd = recover val
-      let arr = Array[ByteSeq](patterns.size() + 1)
-      arr.push("PUNSUBSCRIBE")
-      for pat in patterns.values() do arr.push(pat) end
-      arr
-    end
+    let cmd =
+      recover val
+        let arr = Array[ByteSeq](patterns.size() + 1)
+        arr.push("PUNSUBSCRIBE")
+        for pat in patterns.values() do arr.push(pat) end
+        arr
+      end
     if _throttled then
       _send_buffer.push(_BufferedSend(_RespSerializer(cmd)))
     else
@@ -1071,10 +1197,11 @@ primitive _BuildHelloCommand
   fun apply(info: ConnectInfo): Array[ByteSeq] val =>
     match \exhaustive\ info.password
     | let password: String =>
-      let user = match \exhaustive\ info.username
-      | let u: String => u
-      | None => "default"
-      end
+      let user =
+        match \exhaustive\ info.username
+        | let u: String => u
+        | None => "default"
+        end
       recover val [as ByteSeq: "HELLO"; "3"; "AUTH"; user; password] end
     | None =>
       recover val [as ByteSeq: "HELLO"; "3"] end

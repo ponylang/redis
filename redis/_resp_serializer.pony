@@ -17,10 +17,11 @@ primitive _RespSerializer
       buf.push('\n')
 
       for elem in command.values() do
-        let elem_size = match \exhaustive\ elem
-        | let s: String val => s.size()
-        | let a: Array[U8] val => a.size()
-        end
+        let elem_size =
+          match \exhaustive\ elem
+          | let s: String val => s.size()
+          | let a: Array[U8] val => a.size()
+          end
 
         // $<len>\r\n
         buf.push('$')

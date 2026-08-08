@@ -6,6 +6,9 @@ trait val ClientError
   because the connection was lost or the data stream became corrupt).
   """
   fun message(): String
+    """
+    A human-readable description of the error.
+    """
 
 primitive SessionNotReady is ClientError
   """

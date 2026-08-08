@@ -31,24 +31,35 @@ actor Main
     end
 
 actor Client is (SessionStatusNotify & ResultReceiver)
+  """
+  Issues a PING over a TLS connection and prints the response.
+  """
   let _session: Session
   let _out: OutStream
 
-  new create(auth: lori.TCPConnectAuth, info: ServerInfo,
-    sslctx: SSLContext val, out: OutStream)
+  new create(
+    auth: lori.TCPConnectAuth,
+    info: ServerInfo,
+    sslctx: SSLContext val,
+    out: OutStream)
   =>
     _out = out
-    _session = Session(
-      ConnectInfo(auth, info.host, info.port where
-        ssl_mode' = SSLRequired(sslctx)),
-      this)
+    _session =
+      Session(
+        ConnectInfo(
+          auth, info.host, info.port
+          where ssl_mode' = SSLRequired(sslctx)
+        ),
+        this
+      )
 
   be redis_session_ready(session: Session) =>
     _out.print("Connected over TLS and ready.")
     let cmd: Array[ByteSeq] val = ["PING"]
     session.execute(cmd, this)
 
-  be redis_session_connection_failed(session: Session,
+  be redis_session_connection_failed(
+    session: Session,
     reason: ConnectionFailureReason)
   =>
     _out.print("Failed to connect (TLS handshake or TCP failure).")
@@ -60,21 +71,27 @@ actor Client is (SessionStatusNotify & ResultReceiver)
     end
     _session.close()
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+    session: Session,
+    command: Array[ByteSeq] val,
+    failure: ClientError)
   =>
     _out.print("Command failed: " + failure.message())
     _session.close()
 
 class val ServerInfo
+  """
+  Redis server connection details from environment variables.
+  """
   let host: String
   let port: String
   let ca_path: String
 
   new val create(vars: (Array[String] val | None)) =>
     let e = EnvVars(vars)
-    host = try e("REDIS_HOST")? else
-      ifdef linux then "127.0.0.2" else "localhost" end
-    end
+    host =
+      try e("REDIS_HOST")?
+      else ifdef linux then "127.0.0.2" else "localhost" end
+      end
     port = try e("REDIS_PORT")? else "6380" end
     ca_path = try e("REDIS_CA_PATH")? else "/path/to/ca.pem" end

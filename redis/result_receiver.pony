@@ -11,8 +11,10 @@ interface tag ResultReceiver
     `RespError` for server-side errors (e.g., wrong number of arguments).
     """
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+    session: Session,
+    command: Array[ByteSeq] val,
+    failure: ClientError)
     """
     Called when a command failed due to a client-side error. This covers
     both commands that could not be sent (e.g., session not ready or
