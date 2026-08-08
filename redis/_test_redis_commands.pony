@@ -4,7 +4,6 @@ use "pony_test"
 // ---------------------------------------------------------------------------
 // Test helper
 // ---------------------------------------------------------------------------
-
 primitive _ByteSeqString
   """
   Convert a ByteSeq to a String for test assertions.
@@ -18,7 +17,6 @@ primitive _ByteSeqString
 // ---------------------------------------------------------------------------
 // Command builder property-based tests — key-list pattern
 // ---------------------------------------------------------------------------
-
 class \nodoc\ iso _TestRedisKeyDelProperty is
   Property1[Array[String] val]
   fun name(): String => "RedisKey/del/Property"
@@ -79,7 +77,6 @@ class \nodoc\ iso _TestRedisStringMgetProperty is
 // ---------------------------------------------------------------------------
 // Command builder property-based tests — key-then-members pattern
 // ---------------------------------------------------------------------------
-
 class \nodoc\ iso _TestRedisListLpushProperty is
   Property1[(String, Array[String] val)]
   fun name(): String => "RedisList/lpush/Property"
@@ -208,7 +205,6 @@ class \nodoc\ iso _TestRedisHashHdelProperty is
 // ---------------------------------------------------------------------------
 // Command builder property-based tests — key-value pairs pattern
 // ---------------------------------------------------------------------------
-
 class \nodoc\ iso _TestRedisStringMsetProperty is
   Property1[Array[(String, String)] val]
   fun name(): String => "RedisString/mset/Property"
@@ -252,7 +248,6 @@ class \nodoc\ iso _TestRedisStringMsetProperty is
 // ---------------------------------------------------------------------------
 // Command builder example-based tests
 // ---------------------------------------------------------------------------
-
 class \nodoc\ iso _TestRedisServerExamples is UnitTest
   fun name(): String => "RedisServer/Examples"
 
@@ -348,12 +343,12 @@ class \nodoc\ iso _TestRedisStringExamples is UnitTest
     h.assert_eq[String]("k3", _ByteSeqString(mget_cmd(3)?))
 
     // mset
-    let mset_pairs: Array[(String, String)] val = recover val
-      let arr = Array[(String, String)](2)
-      arr.push(("k1", "v1"))
-      arr.push(("k2", "v2"))
-      arr
-    end
+    let mset_pairs: Array[(String, String)] val =
+      recover val
+        Array[(String, String)](2)
+          .> push(("k1", "v1"))
+          .> push(("k2", "v2"))
+      end
     let mset_cmd = RedisString.mset(mset_pairs)
     h.assert_eq[USize](5, mset_cmd.size())
     h.assert_eq[String]("MSET", _ByteSeqString(mset_cmd(0)?))

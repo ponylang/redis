@@ -11,8 +11,8 @@ primitive _IllegalState
     @fprintf(
       @pony_os_stderr(),
       ("An illegal state was encountered in %s at line %s\n" +
-       "Please open an issue at https://github.com/ponylang/redis/issues")
-       .cstring(),
+        "Please open an issue at https://github.com/ponylang/redis/issues")
+        .cstring(),
       loc.file().cstring(),
       loc.line().string().cstring())
     @exit(1)
@@ -26,8 +26,8 @@ primitive _Unreachable
     @fprintf(
       @pony_os_stderr(),
       ("The unreachable was reached in %s at line %s\n" +
-       "Please open an issue at https://github.com/ponylang/redis/issues")
-       .cstring(),
+        "Please open an issue at https://github.com/ponylang/redis/issues")
+        .cstring(),
       loc.file().cstring(),
       loc.line().string().cstring())
     @exit(1)

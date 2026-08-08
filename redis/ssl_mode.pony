@@ -3,7 +3,9 @@ use "ssl/net"
 type SSLMode is (SSLDisabled | SSLRequired)
 
 primitive SSLDisabled
-  """Plaintext TCP connection (default)."""
+  """
+  Plaintext TCP connection (default).
+  """
 
 class val SSLRequired
   """

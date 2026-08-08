@@ -119,4 +119,4 @@ actor \nodoc\ Main is TestList
     test(_TestRedisSetExamples)
 
     // Command API integration test
-    test(_TestCommandApiSetAndGet)
+    test(_TestCommandAPISetAndGet)

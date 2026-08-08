@@ -14,9 +14,12 @@ class \nodoc\ val _RedisTestConfiguration
 
   new val create(vars: (Array[String] val | None)) =>
     let e = EnvVars(vars)
-    host = try e("REDIS_HOST")? else
-      ifdef linux then "127.0.0.2" else "localhost" end
-    end
+    host =
+      try
+        e("REDIS_HOST")?
+      else
+        ifdef linux then "127.0.0.2" else "localhost" end
+      end
     port = try e("REDIS_PORT")? else "6379" end
     ssl_host = try e("REDIS_SSL_HOST")? else host end
     ssl_port = try e("REDIS_SSL_PORT")? else "6380" end
@@ -24,7 +27,6 @@ class \nodoc\ val _RedisTestConfiguration
     resp2_port = try e("REDIS_RESP2_PORT")? else "6381" end
 
 // integration/Session/ConnectAndReady
-
 class \nodoc\ iso _TestSessionConnectAndReady is UnitTest
   fun name(): String =>
     "integration/Session/ConnectAndReady"
@@ -34,9 +36,10 @@ class \nodoc\ iso _TestSessionConnectAndReady is UnitTest
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      _ConnectAndReadyNotify(h))
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        _ConnectAndReadyNotify(h))
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -51,8 +54,9 @@ actor \nodoc\ _ConnectAndReadyNotify is SessionStatusNotify
     _done = true
     _h.complete(true)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -64,7 +68,6 @@ actor \nodoc\ _ConnectAndReadyNotify is SessionStatusNotify
     end
 
 // integration/Session/SetAndGet
-
 class \nodoc\ iso _TestSessionSetAndGet is UnitTest
   fun name(): String =>
     "integration/Session/SetAndGet"
@@ -75,9 +78,10 @@ class \nodoc\ iso _TestSessionSetAndGet is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _SetAndGetClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -136,14 +140,17 @@ actor \nodoc\ _SetAndGetClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(true)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -155,7 +162,6 @@ actor \nodoc\ _SetAndGetClient is (SessionStatusNotify & ResultReceiver)
     end
 
 // integration/Session/ConnectionFailure
-
 class \nodoc\ iso _TestSessionConnectionFailure is UnitTest
   fun name(): String =>
     "integration/Session/ConnectionFailure"
@@ -166,9 +172,10 @@ class \nodoc\ iso _TestSessionConnectionFailure is UnitTest
     let auth = lori.TCPConnectAuth(h.env.root)
     // Connect to a port that is (almost certainly) not listening.
     let host = ifdef linux then "127.0.0.2" else "localhost" end
-    let session = Session(
-      ConnectInfo(auth, host, "59872"),
-      _ConnectionFailureNotify(h))
+    let session =
+      Session(
+        ConnectInfo(auth, host, "59872"),
+        _ConnectionFailureNotify(h))
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -179,8 +186,9 @@ actor \nodoc\ _ConnectionFailureNotify is SessionStatusNotify
   new create(h: TestHelper) =>
     _h = h
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _done = true
     _h.complete(true)
@@ -196,7 +204,6 @@ actor \nodoc\ _ConnectionFailureNotify is SessionStatusNotify
     end
 
 // integration/Session/ExecuteBeforeReady
-
 class \nodoc\ iso _TestSessionExecuteBeforeReady is UnitTest
   fun name(): String =>
     "integration/Session/ExecuteBeforeReady"
@@ -207,9 +214,10 @@ class \nodoc\ iso _TestSessionExecuteBeforeReady is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _ExecuteBeforeReadyClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     // Execute immediately — before redis_session_ready fires.
     let cmd: Array[ByteSeq] val = ["PING"]
     session.execute(cmd, client)
@@ -224,8 +232,10 @@ actor \nodoc\ _ExecuteBeforeReadyClient is
   new create(h: TestHelper) =>
     _h = h
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     match failure
     | SessionNotReady =>
@@ -247,7 +257,6 @@ actor \nodoc\ _ExecuteBeforeReadyClient is
     end
 
 // integration/Session/ExecuteAfterClose
-
 class \nodoc\ iso _TestSessionExecuteAfterClose is UnitTest
   fun name(): String =>
     "integration/Session/ExecuteAfterClose"
@@ -258,9 +267,10 @@ class \nodoc\ iso _TestSessionExecuteAfterClose is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _ExecuteAfterCloseClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -276,8 +286,10 @@ actor \nodoc\ _ExecuteAfterCloseClient is
     let cmd: Array[ByteSeq] val = ["PING"]
     session.execute(cmd, this)
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     match failure
     | SessionClosed =>
@@ -291,14 +303,14 @@ actor \nodoc\ _ExecuteAfterCloseClient is
     _h.fail("Should not have received a response")
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
 
 // integration/Session/MultipleCommands
-
 class \nodoc\ iso _TestSessionMultipleCommands is UnitTest
   fun name(): String =>
     "integration/Session/MultipleCommands"
@@ -309,9 +321,10 @@ class \nodoc\ iso _TestSessionMultipleCommands is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _MultipleCommandsClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -382,14 +395,17 @@ actor \nodoc\ _MultipleCommandsClient is
       _h.complete(false)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -401,7 +417,6 @@ actor \nodoc\ _MultipleCommandsClient is
     end
 
 // integration/Session/Pipeline
-
 class \nodoc\ iso _TestSessionPipeline is UnitTest
   fun name(): String =>
     "integration/Session/Pipeline"
@@ -412,9 +427,10 @@ class \nodoc\ iso _TestSessionPipeline is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _PipelineClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -484,14 +500,17 @@ actor \nodoc\ _PipelineClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(true)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -503,7 +522,6 @@ actor \nodoc\ _PipelineClient is (SessionStatusNotify & ResultReceiver)
     end
 
 // integration/Session/PipelineMixedResponses
-
 class \nodoc\ iso _TestSessionPipelineMixedResponses is UnitTest
   fun name(): String =>
     "integration/Session/PipelineMixedResponses"
@@ -514,9 +532,10 @@ class \nodoc\ iso _TestSessionPipelineMixedResponses is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _PipelineMixedClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -589,14 +608,17 @@ actor \nodoc\ _PipelineMixedClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(false)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -608,7 +630,6 @@ actor \nodoc\ _PipelineMixedClient is (SessionStatusNotify & ResultReceiver)
     end
 
 // integration/Session/PipelineClose
-
 class \nodoc\ iso _TestSessionPipelineClose is UnitTest
   fun name(): String =>
     "integration/Session/PipelineClose"
@@ -619,9 +640,10 @@ class \nodoc\ iso _TestSessionPipelineClose is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _PipelineCloseClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -647,8 +669,10 @@ actor \nodoc\ _PipelineCloseClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(true)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     // Both SessionClosed and SessionConnectionLost are valid here:
     // close() drains pending with SessionClosed, but if lori's
@@ -673,14 +697,14 @@ actor \nodoc\ _PipelineCloseClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(false)
     end
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
 
 // integration/Session/ServerError
-
 class \nodoc\ iso _TestSessionServerError is UnitTest
   fun name(): String =>
     "integration/Session/ServerError"
@@ -691,9 +715,10 @@ class \nodoc\ iso _TestSessionServerError is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _ServerErrorClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -719,14 +744,17 @@ actor \nodoc\ _ServerErrorClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(false)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -738,7 +766,6 @@ actor \nodoc\ _ServerErrorClient is (SessionStatusNotify & ResultReceiver)
     end
 
 // integration/Session/PubSub
-
 class \nodoc\ iso _TestSessionPubSub is UnitTest
   fun name(): String =>
     "integration/Session/PubSub"
@@ -759,8 +786,11 @@ actor \nodoc\ _PubSubClient is
   let _publisher: Session
   var _ready_count: USize = 0
 
-  new create(h: TestHelper, auth: lori.TCPConnectAuth,
-    host: String, port: String)
+  new create(
+      h: TestHelper,
+      auth: lori.TCPConnectAuth,
+      host: String,
+      port: String)
   =>
     _h = h
     _subscriber = Session(ConnectInfo(auth, host, port), this)
@@ -775,14 +805,18 @@ actor \nodoc\ _PubSubClient is
       _subscriber.subscribe(channels, this)
     end
 
-  be redis_subscribed(session: Session, channel: String,
-    count: USize)
+  be redis_subscribed(
+      session: Session,
+      channel: String,
+      count: USize)
   =>
     let cmd: Array[ByteSeq] val = ["PUBLISH"; "_test_pubsub"; "hello"]
     _publisher.execute(cmd, this)
 
-  be redis_message(session: Session, channel: String,
-    data: Array[U8] val)
+  be redis_message(
+      session: Session,
+      channel: String,
+      data: Array[U8] val)
   =>
     if channel != "_test_pubsub" then
       _h.fail("Expected channel '_test_pubsub', got: '" + channel + "'")
@@ -798,8 +832,10 @@ actor \nodoc\ _PubSubClient is
     let channels: Array[String] val = ["_test_pubsub"]
     _subscriber.unsubscribe(channels)
 
-  be redis_unsubscribed(session: Session, channel: String,
-    count: USize)
+  be redis_unsubscribed(
+      session: Session,
+      channel: String,
+      count: USize)
   =>
     if count == 0 then
       _done = true
@@ -810,14 +846,17 @@ actor \nodoc\ _PubSubClient is
     // PUBLISH response — ignore.
     None
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -829,7 +868,6 @@ actor \nodoc\ _PubSubClient is
     end
 
 // integration/Session/PubSubPattern
-
 class \nodoc\ iso _TestSessionPubSubPattern is UnitTest
   fun name(): String =>
     "integration/Session/PubSubPattern"
@@ -850,8 +888,11 @@ actor \nodoc\ _PubSubPatternClient is
   let _publisher: Session
   var _ready_count: USize = 0
 
-  new create(h: TestHelper, auth: lori.TCPConnectAuth,
-    host: String, port: String)
+  new create(
+      h: TestHelper,
+      auth: lori.TCPConnectAuth,
+      host: String,
+      port: String)
   =>
     _h = h
     _subscriber = Session(ConnectInfo(auth, host, port), this)
@@ -866,15 +907,20 @@ actor \nodoc\ _PubSubPatternClient is
       _subscriber.psubscribe(patterns, this)
     end
 
-  be redis_psubscribed(session: Session, pattern: String,
-    count: USize)
+  be redis_psubscribed(
+      session: Session,
+      pattern: String,
+      count: USize)
   =>
     let cmd: Array[ByteSeq] val =
       ["PUBLISH"; "_test_pubsub_p:foo"; "hello"]
     _publisher.execute(cmd, this)
 
-  be redis_pmessage(session: Session, pattern: String,
-    channel: String, data: Array[U8] val)
+  be redis_pmessage(
+      session: Session,
+      pattern: String,
+      channel: String,
+      data: Array[U8] val)
   =>
     if pattern != "_test_pubsub_p:*" then
       _h.fail("Expected pattern '_test_pubsub_p:*', got: '"
@@ -897,8 +943,10 @@ actor \nodoc\ _PubSubPatternClient is
     let patterns: Array[String] val = ["_test_pubsub_p:*"]
     _subscriber.punsubscribe(patterns)
 
-  be redis_punsubscribed(session: Session, pattern: String,
-    count: USize)
+  be redis_punsubscribed(
+      session: Session,
+      pattern: String,
+      count: USize)
   =>
     if count == 0 then
       _done = true
@@ -909,14 +957,17 @@ actor \nodoc\ _PubSubPatternClient is
     // PUBLISH response — ignore.
     None
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -928,7 +979,6 @@ actor \nodoc\ _PubSubPatternClient is
     end
 
 // integration/Session/ExecuteWhileSubscribed
-
 class \nodoc\ iso _TestSessionExecuteWhileSubscribed is UnitTest
   fun name(): String =>
     "integration/Session/ExecuteWhileSubscribed"
@@ -939,9 +989,10 @@ class \nodoc\ iso _TestSessionExecuteWhileSubscribed is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _ExecuteWhileSubscribedClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -957,14 +1008,18 @@ actor \nodoc\ _ExecuteWhileSubscribedClient is
     let channels: Array[String] val = ["_test_exec_subscribed"]
     session.subscribe(channels, this)
 
-  be redis_subscribed(session: Session, channel: String,
-    count: USize)
+  be redis_subscribed(
+      session: Session,
+      channel: String,
+      count: USize)
   =>
     let cmd: Array[ByteSeq] val = ["PING"]
     session.execute(cmd, this)
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     match failure
     | SessionInSubscribedMode =>
@@ -977,8 +1032,10 @@ actor \nodoc\ _ExecuteWhileSubscribedClient is
       _h.complete(false)
     end
 
-  be redis_unsubscribed(session: Session, channel: String,
-    count: USize)
+  be redis_unsubscribed(
+      session: Session,
+      channel: String,
+      count: USize)
   =>
     if count == 0 then
       _done = true
@@ -989,8 +1046,9 @@ actor \nodoc\ _ExecuteWhileSubscribedClient is
     _h.fail("Should not have received a response while subscribed")
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -1002,7 +1060,6 @@ actor \nodoc\ _ExecuteWhileSubscribedClient is
     end
 
 // integration/Session/PubSubBackToReady
-
 class \nodoc\ iso _TestSessionPubSubBackToReady is UnitTest
   fun name(): String =>
     "integration/Session/PubSubBackToReady"
@@ -1013,9 +1070,10 @@ class \nodoc\ iso _TestSessionPubSubBackToReady is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _PubSubBackToReadyClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -1039,15 +1097,19 @@ actor \nodoc\ _PubSubBackToReadyClient is
       session.subscribe(channels, this)
     end
 
-  be redis_subscribed(session: Session, channel: String,
-    count: USize)
+  be redis_subscribed(
+      session: Session,
+      channel: String,
+      count: USize)
   =>
     _was_subscribed = true
     let channels: Array[String] val = ["_test_pubsub_back"]
     session.unsubscribe(channels)
 
-  be redis_unsubscribed(session: Session, channel: String,
-    count: USize)
+  be redis_unsubscribed(
+      session: Session,
+      channel: String,
+      count: USize)
   =>
     // Transition back to ready happens when count == 0.
     // redis_session_ready will fire and we verify with PING.
@@ -1068,14 +1130,17 @@ actor \nodoc\ _PubSubBackToReadyClient is
       _h.complete(false)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -1087,7 +1152,6 @@ actor \nodoc\ _PubSubBackToReadyClient is
     end
 
 // integration/Session/PipelineDrain
-
 class \nodoc\ iso _TestSessionPipelineDrain is UnitTest
   fun name(): String =>
     "integration/Session/PipelineDrain"
@@ -1098,9 +1162,10 @@ class \nodoc\ iso _TestSessionPipelineDrain is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _PipelineDrainClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -1167,8 +1232,10 @@ actor \nodoc\ _PipelineDrainClient is
       _h.complete(false)
     end
 
-  be redis_subscribed(session: Session, channel: String,
-    count: USize)
+  be redis_subscribed(
+      session: Session,
+      channel: String,
+      count: USize)
   =>
     // Subscribe confirmation arrived after pending commands were drained.
     if channel != "_test_pipeline_drain_ch" then
@@ -1181,21 +1248,26 @@ actor \nodoc\ _PipelineDrainClient is
     let channels: Array[String] val = ["_test_pipeline_drain_ch"]
     session.unsubscribe(channels)
 
-  be redis_unsubscribed(session: Session, channel: String,
-    count: USize)
+  be redis_unsubscribed(
+      session: Session,
+      channel: String,
+      count: USize)
   =>
     // When count reaches 0, session transitions back to ready.
     // redis_session_ready will fire and we clean up.
     None
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -1207,7 +1279,6 @@ actor \nodoc\ _PipelineDrainClient is
     end
 
 // integration/Session/SSLConnectionFailure
-
 class \nodoc\ iso _TestSessionSSLConnectionFailure is UnitTest
   fun name(): String =>
     "integration/Session/SSLConnectionFailure"
@@ -1225,10 +1296,12 @@ class \nodoc\ iso _TestSessionSSLConnectionFailure is UnitTest
     let host = ifdef linux then "127.0.0.2" else "localhost" end
     let sslctx: SSLContext val =
       recover val SSLContext end
-    let session = Session(
-      ConnectInfo(auth, host, "59873" where
-        ssl_mode' = SSLRequired(sslctx)),
-      _SSLConnectionFailureNotify(h))
+    let session =
+      Session(
+        ConnectInfo(
+          auth, host, "59873"
+          where ssl_mode' = SSLRequired(sslctx)),
+        _SSLConnectionFailureNotify(h))
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -1239,8 +1312,9 @@ actor \nodoc\ _SSLConnectionFailureNotify is SessionStatusNotify
   new create(h: TestHelper) =>
     _h = h
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _done = true
     _h.complete(true)
@@ -1256,7 +1330,6 @@ actor \nodoc\ _SSLConnectionFailureNotify is SessionStatusNotify
     end
 
 // integration/Session/SSLConnectAndReady
-
 class \nodoc\ iso _TestSessionSSLConnectAndReady is UnitTest
   fun name(): String =>
     "integration/Session/SSLConnectAndReady"
@@ -1272,10 +1345,12 @@ class \nodoc\ iso _TestSessionSSLConnectAndReady is UnitTest
           .> set_client_verify(false)
           .> set_server_verify(false)
       end
-    let session = Session(
-      ConnectInfo(auth, info.ssl_host, info.ssl_port where
-        ssl_mode' = SSLRequired(sslctx)),
-      _SSLConnectAndReadyNotify(h))
+    let session =
+      Session(
+        ConnectInfo(
+          auth, info.ssl_host, info.ssl_port
+          where ssl_mode' = SSLRequired(sslctx)),
+        _SSLConnectAndReadyNotify(h))
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -1290,8 +1365,9 @@ actor \nodoc\ _SSLConnectAndReadyNotify is SessionStatusNotify
     _done = true
     _h.complete(true)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("SSL connection failed")
     _h.complete(false)
@@ -1303,7 +1379,6 @@ actor \nodoc\ _SSLConnectAndReadyNotify is SessionStatusNotify
     end
 
 // integration/Session/SSLSetAndGet
-
 class \nodoc\ iso _TestSessionSSLSetAndGet is UnitTest
   fun name(): String =>
     "integration/Session/SSLSetAndGet"
@@ -1320,10 +1395,12 @@ class \nodoc\ iso _TestSessionSSLSetAndGet is UnitTest
           .> set_server_verify(false)
       end
     let client = _SSLSetAndGetClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.ssl_host, info.ssl_port where
-        ssl_mode' = SSLRequired(sslctx)),
-      client)
+    let session =
+      Session(
+        ConnectInfo(
+          auth, info.ssl_host, info.ssl_port
+          where ssl_mode' = SSLRequired(sslctx)),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -1382,14 +1459,17 @@ actor \nodoc\ _SSLSetAndGetClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(true)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("SSL connection failed")
     _h.complete(false)
@@ -1401,7 +1481,6 @@ actor \nodoc\ _SSLSetAndGetClient is (SessionStatusNotify & ResultReceiver)
     end
 
 // integration/Session/Resp3ConnectAndReady
-
 class \nodoc\ iso _TestSessionResp3ConnectAndReady is UnitTest
   fun name(): String =>
     "integration/Session/Resp3ConnectAndReady"
@@ -1411,9 +1490,10 @@ class \nodoc\ iso _TestSessionResp3ConnectAndReady is UnitTest
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port where protocol' = Resp3),
-      _Resp3ConnectAndReadyNotify(h))
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port where protocol' = Resp3),
+        _Resp3ConnectAndReadyNotify(h))
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -1428,8 +1508,9 @@ actor \nodoc\ _Resp3ConnectAndReadyNotify is SessionStatusNotify
     _done = true
     _h.complete(true)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -1441,7 +1522,6 @@ actor \nodoc\ _Resp3ConnectAndReadyNotify is SessionStatusNotify
     end
 
 // integration/Session/Resp3SetAndGet
-
 class \nodoc\ iso _TestSessionResp3SetAndGet is UnitTest
   fun name(): String =>
     "integration/Session/Resp3SetAndGet"
@@ -1452,9 +1532,10 @@ class \nodoc\ iso _TestSessionResp3SetAndGet is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _Resp3SetAndGetClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port where protocol' = Resp3),
-      client)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port where protocol' = Resp3),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -1514,14 +1595,17 @@ actor \nodoc\ _Resp3SetAndGetClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(true)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -1533,7 +1617,6 @@ actor \nodoc\ _Resp3SetAndGetClient is (SessionStatusNotify & ResultReceiver)
     end
 
 // integration/Session/Resp3FallbackToResp2
-
 class \nodoc\ iso _TestSessionResp3FallbackToResp2 is UnitTest
   fun name(): String =>
     "integration/Session/Resp3FallbackToResp2"
@@ -1544,10 +1627,12 @@ class \nodoc\ iso _TestSessionResp3FallbackToResp2 is UnitTest
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
     let client = _Resp3FallbackClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.resp2_host, info.resp2_port
-        where protocol' = Resp3),
-      client)
+    let session =
+      Session(
+        ConnectInfo(
+          auth, info.resp2_host, info.resp2_port
+          where protocol' = Resp3),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
@@ -1607,14 +1692,17 @@ actor \nodoc\ _Resp3FallbackClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(true)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection to RESP2-only server failed")
     _h.complete(false)
@@ -1625,25 +1713,25 @@ actor \nodoc\ _Resp3FallbackClient is (SessionStatusNotify & ResultReceiver)
       _h.complete(false)
     end
 
-// integration/CommandApi/SetAndGet
-
-class \nodoc\ iso _TestCommandApiSetAndGet is UnitTest
+// integration/CommandAPI/SetAndGet
+class \nodoc\ iso _TestCommandAPISetAndGet is UnitTest
   fun name(): String =>
-    "integration/CommandApi/SetAndGet"
+    "integration/CommandAPI/SetAndGet"
 
   fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
-    let client = _CommandApiSetAndGetClient(h)
-    let session = Session(
-      ConnectInfo(auth, info.host, info.port),
-      client)
+    let client = _CommandAPISetAndGetClient(h)
+    let session =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        client)
     h.dispose_when_done(session)
     h.long_test(5_000_000_000)
 
-actor \nodoc\ _CommandApiSetAndGetClient is
+actor \nodoc\ _CommandAPISetAndGetClient is
   (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
   var _done: Bool = false
@@ -1687,14 +1775,17 @@ actor \nodoc\ _CommandApiSetAndGetClient is
       _h.complete(true)
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     _h.fail("Command failed: " + failure.message())
     _h.complete(false)
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection failed")
     _h.complete(false)
@@ -1713,7 +1804,6 @@ actor \nodoc\ _CommandApiSetAndGetClient is
 // session goes straight to _SessionReady without needing a server response.
 // The client sends a burst of commands with send_buffer_limit = 1, so the
 // second buffered command triggers SessionBackpressureOverflow.
-
 class \nodoc\ iso _TestSessionBackpressureOverflow is UnitTest
   fun name(): String =>
     "Session/BackpressureOverflow"
@@ -1732,15 +1822,17 @@ actor \nodoc\ _MutedServerListener is lori.TCPListenerActor
   let _host: String
   let _port: String
   var _tcp_listener: lori.TCPListener = lori.TCPListener.none()
-  let _connections: Array[_MutedServerConnection] = Array[_MutedServerConnection]
+  let _connections: Array[_MutedServerConnection] =
+    Array[_MutedServerConnection]
 
   new create(h: TestHelper, auth: AmbientAuth, host: String, port: String) =>
     _h = h
     _auth = auth
     _host = host
     _port = port
-    _tcp_listener = lori.TCPListener(lori.TCPListenAuth(auth), host, port,
-      this)
+    _tcp_listener =
+      lori.TCPListener(
+        lori.TCPListenAuth(auth), host, port, this)
 
   fun ref _listener(): lori.TCPListener => _tcp_listener
 
@@ -1752,10 +1844,12 @@ actor \nodoc\ _MutedServerListener is lori.TCPListenerActor
   fun ref _on_listening() =>
     let connect_auth = lori.TCPConnectAuth(_auth)
     let client = _BackpressureOverflowClient(_h, this)
-    let session = Session(
-      ConnectInfo(connect_auth, _host, _port
-        where send_buffer_limit' = 1),
-      client)
+    let session =
+      Session(
+        ConnectInfo(
+          connect_auth, _host, _port
+          where send_buffer_limit' = 1),
+        client)
     _h.dispose_when_done(session)
 
   fun ref _on_listen_failure() =>
@@ -1793,8 +1887,11 @@ actor \nodoc\ _BackpressureOverflowClient is
   be redis_session_ready(session: Session) =>
     // Send a burst of large commands to fill the TCP send buffer.
     // With send_buffer_limit = 1, the second buffered command will overflow.
-    let payload = recover val String.from_array(
-      recover val Array[U8].init('x', 65536) end) end
+    let payload =
+      recover val
+        String.from_array(
+          recover val Array[U8].init('x', 65536) end)
+      end
     var i: USize = 0
     while i < 1000 do
       session.execute(
@@ -1807,8 +1904,10 @@ actor \nodoc\ _BackpressureOverflowClient is
     // If it does, ignore — we're only checking for overflow.
     None
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+      session: Session,
+      command: Array[ByteSeq] val,
+      failure: ClientError)
   =>
     match failure
     | SessionBackpressureOverflow =>
@@ -1825,8 +1924,9 @@ actor \nodoc\ _BackpressureOverflowClient is
       _h.complete(false)
     end
 
-  be redis_session_connection_failed(session: Session,
-    reason: ConnectionFailureReason)
+  be redis_session_connection_failed(
+      session: Session,
+      reason: ConnectionFailureReason)
   =>
     _h.fail("Connection to fake server failed")
     _h.complete(false)
@@ -1838,7 +1938,6 @@ actor \nodoc\ _BackpressureOverflowClient is
     end
 
 // BuildHelloCommand
-
 class \nodoc\ iso _TestBuildHelloCommand is UnitTest
   fun name(): String => "BuildHelloCommand"
 
@@ -1853,8 +1952,10 @@ class \nodoc\ iso _TestBuildHelloCommand is UnitTest
     _assert_byteseq(h, "3", cmd1(1)?)
 
     // Password, no username: ["HELLO"; "3"; "AUTH"; "default"; "secret"]
-    let pw_no_user = ConnectInfo(auth, "localhost"
-      where password' = "secret", protocol' = Resp3)
+    let pw_no_user =
+      ConnectInfo(
+        auth, "localhost"
+        where password' = "secret", protocol' = Resp3)
     let cmd2 = _BuildHelloCommand(pw_no_user)
     h.assert_eq[USize](5, cmd2.size())
     _assert_byteseq(h, "HELLO", cmd2(0)?)
@@ -1864,8 +1965,11 @@ class \nodoc\ iso _TestBuildHelloCommand is UnitTest
     _assert_byteseq(h, "secret", cmd2(4)?)
 
     // Password + username: ["HELLO"; "3"; "AUTH"; "myuser"; "secret"]
-    let pw_user = ConnectInfo(auth, "localhost"
-      where password' = "secret", username' = "myuser", protocol' = Resp3)
+    let pw_user =
+      ConnectInfo(
+        auth, "localhost"
+        where password' = "secret",
+          username' = "myuser", protocol' = Resp3)
     let cmd3 = _BuildHelloCommand(pw_user)
     h.assert_eq[USize](5, cmd3.size())
     _assert_byteseq(h, "HELLO", cmd3(0)?)
@@ -1883,7 +1987,6 @@ class \nodoc\ iso _TestBuildHelloCommand is UnitTest
     end
 
 // BuildAuthCommand
-
 class \nodoc\ iso _TestBuildAuthCommand is UnitTest
   fun name(): String => "BuildAuthCommand"
 

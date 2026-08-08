@@ -11,6 +11,9 @@ actor Main
     Client(auth, info, env.out)
 
 actor Client is (SessionStatusNotify & ResultReceiver)
+  """
+  Sends a burst of SET commands to demonstrate backpressure handling.
+  """
   let _session: Session
   let _out: OutStream
   let _total: USize = 1000
@@ -21,9 +24,14 @@ actor Client is (SessionStatusNotify & ResultReceiver)
   new create(auth: lori.TCPConnectAuth, info: ServerInfo, out: OutStream) =>
     _out = out
     // Use a small buffer limit so that overflow is likely during the burst.
-    _session = Session(
-      ConnectInfo(auth, info.host, info.port where send_buffer_limit' = 100),
-      this)
+    _session =
+      Session(
+        ConnectInfo(
+          auth, info.host, info.port
+          where send_buffer_limit' = 100
+        ),
+        this
+      )
 
   be redis_session_ready(session: Session) =>
     _out.print("Connected and ready. Sending " + _total.string()
@@ -37,7 +45,8 @@ actor Client is (SessionStatusNotify & ResultReceiver)
   be redis_session_unthrottled(session: Session) =>
     _out.print("Unthrottled — flushing buffered commands.")
 
-  be redis_session_connection_failed(session: Session,
+  be redis_session_connection_failed(
+    session: Session,
     reason: ConnectionFailureReason)
   =>
     _out.print("Failed to connect.")
@@ -54,8 +63,10 @@ actor Client is (SessionStatusNotify & ResultReceiver)
       _session.close()
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+    session: Session,
+    command: Array[ByteSeq] val,
+    failure: ClientError)
   =>
     match failure
     | SessionBackpressureOverflow =>
@@ -78,12 +89,16 @@ actor Client is (SessionStatusNotify & ResultReceiver)
     end
 
 class val ServerInfo
+  """
+  Redis server connection details from environment variables.
+  """
   let host: String
   let port: String
 
   new val create(vars: (Array[String] val | None)) =>
     let e = EnvVars(vars)
-    host = try e("REDIS_HOST")? else
-      ifdef linux then "127.0.0.2" else "localhost" end
-    end
+    host =
+      try e("REDIS_HOST")?
+      else ifdef linux then "127.0.0.2" else "localhost" end
+      end
     port = try e("REDIS_PORT")? else "6379" end
