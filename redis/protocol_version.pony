@@ -2,7 +2,9 @@
 type ProtocolVersion is (Resp2 | Resp3)
 
 primitive Resp2
-  """RESP2 protocol (default). Compatible with all Redis versions."""
+  """
+  RESP2 protocol (default). Compatible with all Redis versions.
+  """
 
 primitive Resp3
   """

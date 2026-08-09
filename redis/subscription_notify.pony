@@ -27,7 +27,9 @@ interface tag SubscriptionNotify
     """
     None
 
-  be redis_message(session: Session, channel: String,
+  be redis_message(
+    session: Session,
+    channel: String,
     data: Array[U8] val)
   =>
     """
@@ -37,7 +39,9 @@ interface tag SubscriptionNotify
     """
     None
 
-  be redis_psubscribed(session: Session, pattern: String,
+  be redis_psubscribed(
+    session: Session,
+    pattern: String,
     count: USize)
   =>
     """
@@ -47,7 +51,9 @@ interface tag SubscriptionNotify
     """
     None
 
-  be redis_punsubscribed(session: Session, pattern: String,
+  be redis_punsubscribed(
+    session: Session,
+    pattern: String,
     count: USize)
   =>
     """
@@ -58,7 +64,10 @@ interface tag SubscriptionNotify
     """
     None
 
-  be redis_pmessage(session: Session, pattern: String, channel: String,
+  be redis_pmessage(
+    session: Session,
+    pattern: String,
+    channel: String,
     data: Array[U8] val)
   =>
     """

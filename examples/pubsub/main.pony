@@ -12,22 +12,31 @@ actor Main
 
 actor PubSubDemo is
   (SessionStatusNotify & SubscriptionNotify & ResultReceiver)
+  """
+  Subscribes to a channel, publishes a message, and unsubscribes.
+  """
   let _subscriber: Session
   let _publisher: Session
   let _out: OutStream
   var _subscriber_ready: Bool = false
   var _publisher_ready: Bool = false
 
-  new create(auth: lori.TCPConnectAuth, info: ServerInfo,
+  new create(
+    auth: lori.TCPConnectAuth,
+    info: ServerInfo,
     out: OutStream)
   =>
     _out = out
-    _subscriber = Session(
-      ConnectInfo(auth, info.host, info.port),
-      this)
-    _publisher = Session(
-      ConnectInfo(auth, info.host, info.port),
-      this)
+    _subscriber =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        this
+      )
+    _publisher =
+      Session(
+        ConnectInfo(auth, info.host, info.port),
+        this
+      )
 
   be redis_session_ready(session: Session) =>
     if session is _subscriber then
@@ -41,9 +50,14 @@ actor PubSubDemo is
       _subscriber.subscribe(channels, this)
     end
 
-  be redis_subscribed(session: Session, channel: String,
+  be redis_subscribed(
+    session: Session,
+    channel: String,
     count: USize)
   =>
+    """
+    Called when a channel subscription is confirmed.
+    """
     _out.print("Subscribed to '" + channel + "' (active: "
       + count.string() + ")")
     _out.print("Publishing a message...")
@@ -51,16 +65,23 @@ actor PubSubDemo is
       ["PUBLISH"; "demo-channel"; "Hello from Pony!"]
     _publisher.execute(cmd, this)
 
-  be redis_message(session: Session, channel: String,
+  be redis_message(
+    session: Session,
+    channel: String,
     data: Array[U8] val)
   =>
+    """
+    Called when a message is received on a subscribed channel.
+    """
     _out.print("Received message on '" + channel + "': "
       + String.from_array(data))
     _out.print("Unsubscribing...")
     let channels: Array[String] val = ["demo-channel"]
     _subscriber.unsubscribe(channels)
 
-  be redis_unsubscribed(session: Session, channel: String,
+  be redis_unsubscribed(
+    session: Session,
+    channel: String,
     count: USize)
   =>
     _out.print("Unsubscribed from '" + channel + "' (remaining: "
@@ -68,7 +89,8 @@ actor PubSubDemo is
     _subscriber.close()
     _publisher.close()
 
-  be redis_session_connection_failed(session: Session,
+  be redis_session_connection_failed(
+    session: Session,
     reason: ConnectionFailureReason)
   =>
     _out.print("Failed to connect.")
@@ -80,18 +102,24 @@ actor PubSubDemo is
         + " subscriber(s).")
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+    session: Session,
+    command: Array[ByteSeq] val,
+    failure: ClientError)
   =>
     _out.print("Command failed: " + failure.message())
 
 class val ServerInfo
+  """
+  Redis server connection details from environment variables.
+  """
   let host: String
   let port: String
 
   new val create(vars: (Array[String] val | None)) =>
     let e = EnvVars(vars)
-    host = try e("REDIS_HOST")? else
-      ifdef linux then "127.0.0.2" else "localhost" end
-    end
+    host =
+      try e("REDIS_HOST")?
+      else ifdef linux then "127.0.0.2" else "localhost" end
+      end
     port = try e("REDIS_PORT")? else "6379" end

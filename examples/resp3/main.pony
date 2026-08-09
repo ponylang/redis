@@ -11,15 +11,23 @@ actor Main
     Client(auth, info, env.out)
 
 actor Client is (SessionStatusNotify & ResultReceiver)
+  """
+  Connects with RESP3, writes hash fields, and reads them back as a map.
+  """
   let _session: Session
   let _out: OutStream
   var _step: USize = 0
 
   new create(auth: lori.TCPConnectAuth, info: ServerInfo, out: OutStream) =>
     _out = out
-    _session = Session(
-      ConnectInfo(auth, info.host, info.port where protocol' = Resp3),
-      this)
+    _session =
+      Session(
+        ConnectInfo(
+          auth, info.host, info.port
+          where protocol' = Resp3
+        ),
+        this
+      )
 
   be redis_session_ready(session: Session) =>
     _out.print("Connected with RESP3 protocol.")
@@ -28,7 +36,8 @@ actor Client is (SessionStatusNotify & ResultReceiver)
       ["HSET"; "_resp3_example"; "name"; "Pony"; "version"; "0.60"]
     session.execute(cmd, this)
 
-  be redis_session_connection_failed(session: Session,
+  be redis_session_connection_failed(
+    session: Session,
     reason: ConnectionFailureReason)
   =>
     _out.print("Failed to connect.")
@@ -48,14 +57,16 @@ actor Client is (SessionStatusNotify & ResultReceiver)
         _out.print("HGETALL returned a map with "
           + m.pairs.size().string() + " pairs:")
         for (k, v) in m.pairs.values() do
-          let ks = match k
-          | let b: RespBulkString => String.from_array(b.value)
-          else "?"
-          end
-          let vs = match v
-          | let b: RespBulkString => String.from_array(b.value)
-          else "?"
-          end
+          let ks =
+            match k
+            | let b: RespBulkString => String.from_array(b.value)
+            else "?"
+            end
+          let vs =
+            match v
+            | let b: RespBulkString => String.from_array(b.value)
+            else "?"
+            end
           _out.print("  " + ks + " = " + vs)
         end
       | let a: RespArray =>
@@ -73,19 +84,25 @@ actor Client is (SessionStatusNotify & ResultReceiver)
       _session.close()
     end
 
-  be redis_command_failed(session: Session,
-    command: Array[ByteSeq] val, failure: ClientError)
+  be redis_command_failed(
+    session: Session,
+    command: Array[ByteSeq] val,
+    failure: ClientError)
   =>
     _out.print("Command failed: " + failure.message())
     _session.close()
 
 class val ServerInfo
+  """
+  Redis server connection details from environment variables.
+  """
   let host: String
   let port: String
 
   new val create(vars: (Array[String] val | None)) =>
     let e = EnvVars(vars)
-    host = try e("REDIS_HOST")? else
-      ifdef linux then "127.0.0.2" else "localhost" end
-    end
+    host =
+      try e("REDIS_HOST")?
+      else ifdef linux then "127.0.0.2" else "localhost" end
+      end
     port = try e("REDIS_PORT")? else "6379" end

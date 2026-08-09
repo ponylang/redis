@@ -295,7 +295,6 @@ class \nodoc\ iso _TestRespConvertIsOk is Property1[RespValue]
 // ---------------------------------------------------------------------------
 // RespConvert example-based tests
 // ---------------------------------------------------------------------------
-
 class \nodoc\ iso _TestRespConvertIsOkExamples is UnitTest
   fun name(): String => "RespConvert/is_ok/Examples"
 

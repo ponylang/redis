@@ -5,7 +5,6 @@ use "pony_test"
 // ---------------------------------------------------------------------------
 // Test helpers used by both parser and serializer tests
 // ---------------------------------------------------------------------------
-
 primitive _TestRespSerializer
   """
   Serialize any RespValue into RESP2/RESP3 wire format bytes. Unlike
@@ -22,7 +21,7 @@ primitive _TestRespSerializer
     end
 
   fun _serialize(buf: Array[U8] ref, value: RespValue) =>
-    match value
+    match \exhaustive\ value
     | let s: RespSimpleString =>
       buf.push('+')
       for byte in s.value.values() do buf.push(byte) end
@@ -330,7 +329,8 @@ primitive _RespGens
     """
     Generators.byte_string(Generators.u8(), 0, 80)
       .map[RespVerbatimString]({(s) =>
-        RespVerbatimString("txt",
+        RespVerbatimString(
+          "txt",
           recover val
             let out = Array[U8](s.size())
             for b in s.values() do out.push(b) end
@@ -355,7 +355,8 @@ primitive _RespGens
             elem_gen, count * 2, count * 2)
             .map[RespMap]({(elems) =>
               let arr: Array[RespValue] val = consume elems
-              let pairs = recover val
+              let pairs =
+                recover val
                 let p = Array[(RespValue, RespValue)](arr.size() / 2)
                 try
                   var i: USize = 0
@@ -417,22 +418,22 @@ primitive _RespGens
     if max_depth == 0 then
       _leaf_value()
     else
-      Generators.frequency[RespValue]([
-        (3, simple_string().map[RespValue]({(s) => s }))
-        (3, bulk_string().map[RespValue]({(b) => b }))
-        (3, integer().map[RespValue]({(i) => i }))
-        (2, resp_error().map[RespValue]({(e) => e }))
-        (1, null_value().map[RespValue]({(n) => n }))
-        (2, array(max_depth - 1).map[RespValue]({(a) => a }))
-        (2, boolean().map[RespValue]({(b) => b }))
-        (2, double().map[RespValue]({(d) => d }))
-        (1, big_number().map[RespValue]({(b) => b }))
-        (1, bulk_error().map[RespValue]({(b) => b }))
-        (1, verbatim_string().map[RespValue]({(v) => v }))
-        (2, resp_map(max_depth - 1).map[RespValue]({(m) => m }))
-        (2, resp_set(max_depth - 1).map[RespValue]({(s) => s }))
-        (1, push(max_depth - 1).map[RespValue]({(p) => p }))
-      ])
+      Generators.frequency[RespValue](
+        [ (3, simple_string().map[RespValue]({(s) => s }))
+          (3, bulk_string().map[RespValue]({(b) => b }))
+          (3, integer().map[RespValue]({(i) => i }))
+          (2, resp_error().map[RespValue]({(e) => e }))
+          (1, null_value().map[RespValue]({(n) => n }))
+          (2, array(max_depth - 1).map[RespValue]({(a) => a }))
+          (2, boolean().map[RespValue]({(b) => b }))
+          (2, double().map[RespValue]({(d) => d }))
+          (1, big_number().map[RespValue]({(b) => b }))
+          (1, bulk_error().map[RespValue]({(b) => b }))
+          (1, verbatim_string().map[RespValue]({(v) => v }))
+          (2, resp_map(max_depth - 1).map[RespValue]({(m) => m }))
+          (2, resp_set(max_depth - 1).map[RespValue]({(s) => s }))
+          (1, push(max_depth - 1).map[RespValue]({(p) => p }))
+        ])
     end
 
   fun array(max_depth: USize = 2): Generator[RespArray] =>
@@ -458,18 +459,18 @@ primitive _RespGens
     """
     Generate only non-recursive RespValue types.
     """
-    Generators.frequency[RespValue]([
-      (3, simple_string().map[RespValue]({(s) => s }))
-      (3, bulk_string().map[RespValue]({(b) => b }))
-      (3, integer().map[RespValue]({(i) => i }))
-      (2, resp_error().map[RespValue]({(e) => e }))
-      (1, null_value().map[RespValue]({(n) => n }))
-      (2, boolean().map[RespValue]({(b) => b }))
-      (2, double().map[RespValue]({(d) => d }))
-      (1, big_number().map[RespValue]({(b) => b }))
-      (1, bulk_error().map[RespValue]({(b) => b }))
-      (1, verbatim_string().map[RespValue]({(v) => v }))
-    ])
+    Generators.frequency[RespValue](
+      [ (3, simple_string().map[RespValue]({(s) => s }))
+        (3, bulk_string().map[RespValue]({(b) => b }))
+        (3, integer().map[RespValue]({(i) => i }))
+        (2, resp_error().map[RespValue]({(e) => e }))
+        (1, null_value().map[RespValue]({(n) => n }))
+        (2, boolean().map[RespValue]({(b) => b }))
+        (2, double().map[RespValue]({(d) => d }))
+        (1, big_number().map[RespValue]({(b) => b }))
+        (1, bulk_error().map[RespValue]({(b) => b }))
+        (1, verbatim_string().map[RespValue]({(v) => v }))
+      ])
 
   fun command(): Generator[Array[ByteSeq] val] =>
     """
@@ -489,8 +490,8 @@ primitive _RespGens
 // ---------------------------------------------------------------------------
 // Serializer property-based tests
 // ---------------------------------------------------------------------------
-
-class \nodoc\ iso _TestRespSerializerCommandRoundtrip is Property1[Array[ByteSeq] val]
+class \nodoc\ iso _TestRespSerializerCommandRoundtrip is
+  Property1[Array[ByteSeq] val]
   """
   Verify that serialized commands parse back to a RespArray of RespBulkStrings
   matching the original input.
@@ -511,15 +512,16 @@ class \nodoc\ iso _TestRespSerializerCommandRoundtrip is Property1[Array[ByteSeq
       while i < command.size() do
         match arr.values(i)?
         | let bs: RespBulkString =>
-          let expected: Array[U8] val = match \exhaustive\ command(i)?
-          | let s: String val =>
-            recover val
-              let a = Array[U8](s.size())
-              for byte in s.values() do a.push(byte) end
-              a
+          let expected: Array[U8] val =
+            match \exhaustive\ command(i)?
+            | let s: String val =>
+              recover val
+                let a = Array[U8](s.size())
+                for byte in s.values() do a.push(byte) end
+                a
+              end
+            | let a: Array[U8] val => a
             end
-          | let a: Array[U8] val => a
-          end
           h.assert_true(
             _RespValueEq._byte_arrays_eq(expected, bs.value),
             "Element " + i.string() + " mismatch")
@@ -534,7 +536,8 @@ class \nodoc\ iso _TestRespSerializerCommandRoundtrip is Property1[Array[ByteSeq
       h.fail("Serialized command did not parse to RespArray")
     end
 
-class \nodoc\ iso _TestRespSerializerOutputIsValidResp is Property1[Array[ByteSeq] val]
+class \nodoc\ iso _TestRespSerializerOutputIsValidResp is
+  Property1[Array[ByteSeq] val]
   """
   Verify that _RespSerializer output always parses successfully.
   """
@@ -555,17 +558,18 @@ class \nodoc\ iso _TestRespSerializerOutputIsValidResp is Property1[Array[ByteSe
 // ---------------------------------------------------------------------------
 // Serializer example-based tests
 // ---------------------------------------------------------------------------
-
 class \nodoc\ iso _TestRespSerializerSimpleCommand is UnitTest
   fun name(): String => "RespSerializer/SimpleCommand"
 
   fun apply(h: TestHelper) =>
-    let command: Array[ByteSeq] val = recover val
+    let command: Array[ByteSeq] val =
+      recover val
       [as ByteSeq: "GET"; "key"]
     end
     let result = _RespSerializer(command)
-    let expected: Array[U8] val = recover val
-      [as U8:
+    let expected: Array[U8] val =
+      recover val
+      [ as U8:
         '*'; '2'; '\r'; '\n'
         '$'; '3'; '\r'; '\n'; 'G'; 'E'; 'T'; '\r'; '\n'
         '$'; '3'; '\r'; '\n'; 'k'; 'e'; 'y'; '\r'; '\n']
@@ -576,12 +580,14 @@ class \nodoc\ iso _TestRespSerializerSingleElement is UnitTest
   fun name(): String => "RespSerializer/SingleElement"
 
   fun apply(h: TestHelper) =>
-    let command: Array[ByteSeq] val = recover val
+    let command: Array[ByteSeq] val =
+      recover val
       [as ByteSeq: "PING"]
     end
     let result = _RespSerializer(command)
-    let expected: Array[U8] val = recover val
-      [as U8:
+    let expected: Array[U8] val =
+      recover val
+      [ as U8:
         '*'; '1'; '\r'; '\n'
         '$'; '4'; '\r'; '\n'; 'P'; 'I'; 'N'; 'G'; '\r'; '\n']
     end
@@ -591,11 +597,13 @@ class \nodoc\ iso _TestRespSerializerEmptyCommand is UnitTest
   fun name(): String => "RespSerializer/EmptyCommand"
 
   fun apply(h: TestHelper) =>
-    let command: Array[ByteSeq] val = recover val
+    let command: Array[ByteSeq] val =
+      recover val
       Array[ByteSeq]
     end
     let result = _RespSerializer(command)
-    let expected: Array[U8] val = recover val
+    let expected: Array[U8] val =
+      recover val
       [as U8: '*'; '0'; '\r'; '\n']
     end
     h.assert_array_eq[U8](expected, result)
@@ -604,15 +612,18 @@ class \nodoc\ iso _TestRespSerializerBinaryData is UnitTest
   fun name(): String => "RespSerializer/BinaryData"
 
   fun apply(h: TestHelper) =>
-    let binary: Array[U8] val = recover val
+    let binary: Array[U8] val =
+      recover val
       [as U8: 0x00; 0xFF; '\r'; '\n'; 0x42]
     end
-    let command: Array[ByteSeq] val = recover val
+    let command: Array[ByteSeq] val =
+      recover val
       [as ByteSeq: "SET"; "key"; binary]
     end
     let result = _RespSerializer(command)
-    let expected: Array[U8] val = recover val
-      [as U8:
+    let expected: Array[U8] val =
+      recover val
+      [ as U8:
         '*'; '3'; '\r'; '\n'
         '$'; '3'; '\r'; '\n'; 'S'; 'E'; 'T'; '\r'; '\n'
         '$'; '3'; '\r'; '\n'; 'k'; 'e'; 'y'; '\r'; '\n'

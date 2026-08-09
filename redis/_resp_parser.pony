@@ -34,8 +34,10 @@ primitive _RespParser
       return None
     end
 
-    let type_byte = try buffer.peek_u8(offset)?
-    else return RespMalformed("unexpected end of buffer") end
+    let type_byte =
+      try buffer.peek_u8(offset)?
+      else return RespMalformed("unexpected end of buffer")
+      end
 
     match type_byte
     // RESP2 types
@@ -99,7 +101,8 @@ primitive _RespParser
     """
     match \exhaustive\ _line_size(buffer, offset)
     | let header_size: USize =>
-      match \exhaustive\ _read_line_as_i64(buffer, offset + 1, (offset + header_size) - 2)
+      match \exhaustive\ _read_line_as_i64(
+        buffer, offset + 1, (offset + header_size) - 2)
       | let len: I64 =>
         if len == -1 then
           return header_size
@@ -165,7 +168,7 @@ primitive _RespParser
     """
     match \exhaustive\ _line_size(buffer, offset)
     | let header_size: USize =>
-      match _read_line_as_i64(
+      match \exhaustive\ _read_line_as_i64(
         buffer, offset + 1, (offset + header_size) - 2)
       | let count: I64 =>
         if count == -1 then
@@ -175,8 +178,10 @@ primitive _RespParser
           return RespMalformed(
             "negative map count: " + count.string())
         end
-        let num_elements = try count.mul_partial(2)?
-        else return RespMalformed("map count overflow") end
+        let num_elements =
+          try count.mul_partial(2)?
+          else return RespMalformed("map count overflow")
+          end
         var total = header_size
         var i: I64 = 0
         while i < num_elements do
@@ -205,8 +210,10 @@ primitive _RespParser
 
     var negative = false
     var start = from
-    let first = try buffer.peek_u8(start)?
-    else return RespMalformed("unexpected end of buffer") end
+    let first =
+      try buffer.peek_u8(start)?
+      else return RespMalformed("unexpected end of buffer")
+      end
 
     if first == '-' then
       negative = true
@@ -219,16 +226,19 @@ primitive _RespParser
     var result: I64 = 0
     var i = start
     while i < to do
-      let b = try buffer.peek_u8(i)?
-      else return RespMalformed("unexpected end of buffer") end
+      let b =
+        try buffer.peek_u8(i)?
+        else return RespMalformed("unexpected end of buffer")
+        end
       if (b < '0') or (b > '9') then
         return RespMalformed("non-digit byte in integer value")
       end
-      result = try
-        result.mul_partial(10)?.add_partial((b - '0').i64())?
-      else
-        return RespMalformed("integer value out of range")
-      end
+      result =
+        try
+          result.mul_partial(10)?.add_partial((b - '0').i64())?
+        else
+          return RespMalformed("integer value out of range")
+        end
       i = i + 1
     end
 
@@ -270,9 +280,10 @@ primitive _RespParser
       if count == -1 then
         RespNull
       else
-        let arr: Array[RespValue] iso = recover iso
-          Array[RespValue](count.usize())
-        end
+        let arr: Array[RespValue] iso =
+          recover iso
+            Array[RespValue](count.usize())
+          end
         var i: I64 = 0
         while i < count do
           arr.push(_parse(buffer)?)
@@ -307,23 +318,25 @@ primitive _RespParser
       let line = buffer.line()?
       let len = (consume line).i64()?
       if len == -1 then error end
-      let data: Array[U8] val = recover val buffer.block(len.usize())? end
+      let data: Array[U8] val =
+        recover val buffer.block(len.usize())? end
       buffer.skip(2)?
       if data.size() < 4 then error end
       if data(3)? != ':' then error end
-      let enc_arr: Array[U8] val = recover val
-        let enc = Array[U8](3)
-        enc.push(data(0)?)
-        enc.push(data(1)?)
-        enc.push(data(2)?)
-        enc
-      end
+      let enc_arr: Array[U8] val =
+        recover val
+          Array[U8](3)
+            .> push(data(0)?)
+            .> push(data(1)?)
+            .> push(data(2)?)
+        end
       let encoding = String.from_array(enc_arr)
-      let value: Array[U8] val = if data.size() > 4 then
-        data.trim(4)
-      else
-        recover val Array[U8] end
-      end
+      let value: Array[U8] val =
+        if data.size() > 4 then
+          data.trim(4)
+        else
+          recover val Array[U8] end
+        end
       RespVerbatimString(encoding, value)
     | '%' =>
       let line = buffer.line()?
@@ -331,9 +344,10 @@ primitive _RespParser
       if count == -1 then
         RespNull
       else
-        let pairs: Array[(RespValue, RespValue)] iso = recover iso
-          Array[(RespValue, RespValue)](count.usize())
-        end
+        let pairs: Array[(RespValue, RespValue)] iso =
+          recover iso
+            Array[(RespValue, RespValue)](count.usize())
+          end
         var i: I64 = 0
         while i < count do
           let key = _parse(buffer)?
@@ -349,9 +363,10 @@ primitive _RespParser
       if count == -1 then
         RespNull
       else
-        let arr: Array[RespValue] iso = recover iso
-          Array[RespValue](count.usize())
-        end
+        let arr: Array[RespValue] iso =
+          recover iso
+            Array[RespValue](count.usize())
+          end
         var i: I64 = 0
         while i < count do
           arr.push(_parse(buffer)?)
@@ -363,9 +378,10 @@ primitive _RespParser
       let line = buffer.line()?
       let count = (consume line).i64()?
       if count == -1 then error end
-      let arr: Array[RespValue] iso = recover iso
-        Array[RespValue](count.usize())
-      end
+      let arr: Array[RespValue] iso =
+        recover iso
+          Array[RespValue](count.usize())
+        end
       var i: I64 = 0
       while i < count do
         arr.push(_parse(buffer)?)
