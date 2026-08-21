@@ -34,13 +34,13 @@ actor Client is (SessionStatusNotify & ResultReceiver)
       )
 
   be redis_session_ready(session: Session) =>
-    _out.print("Connected and ready. Sending " + _total.string()
-      + " SET commands (buffer limit 100)...")
+    _out.print("Connected and ready. Sending " + _total.string() +
+      " SET commands (buffer limit 100)...")
     _send_burst(session)
 
   be redis_session_throttled(session: Session) =>
-    _out.print("Throttled after " + _sent.string() + " sends — "
-      + "commands are being buffered.")
+    _out.print("Throttled after " + _sent.string() + " sends — " +
+      "commands are being buffered.")
 
   be redis_session_unthrottled(session: Session) =>
     _out.print("Unthrottled — flushing buffered commands.")
@@ -58,8 +58,8 @@ actor Client is (SessionStatusNotify & ResultReceiver)
       _out.print("Error on response " + _received.string() + ": " + msg)
     end
     if (_received + _rejected) == _total then
-      _out.print("Done. Received: " + _received.string()
-        + ", rejected (overflow): " + _rejected.string())
+      _out.print("Done. Received: " + _received.string() +
+        ", rejected (overflow): " + _rejected.string())
       _session.close()
     end
 
@@ -72,8 +72,8 @@ actor Client is (SessionStatusNotify & ResultReceiver)
     | SessionBackpressureOverflow =>
       _rejected = _rejected + 1
       if (_received + _rejected) == _total then
-        _out.print("Done. Received: " + _received.string()
-          + ", rejected (overflow): " + _rejected.string())
+        _out.print("Done. Received: " + _received.string() +
+          ", rejected (overflow): " + _rejected.string())
         _session.close()
       end
     else

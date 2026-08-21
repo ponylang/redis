@@ -26,8 +26,8 @@ actor Main
         end
       Client(auth, info, sslctx, env.out)
     else
-      env.err.print("Failed to create SSLContext. "
-        + "Check that REDIS_CA_PATH points to a valid CA certificate.")
+      env.err.print("Failed to create SSLContext. " +
+        "Check that REDIS_CA_PATH points to a valid CA certificate.")
     end
 
 actor Client is (SessionStatusNotify & ResultReceiver)

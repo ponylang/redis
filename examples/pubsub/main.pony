@@ -58,8 +58,8 @@ actor PubSubDemo is
     """
     Called when a channel subscription is confirmed.
     """
-    _out.print("Subscribed to '" + channel + "' (active: "
-      + count.string() + ")")
+    _out.print("Subscribed to '" + channel + "' (active: " +
+      count.string() + ")")
     _out.print("Publishing a message...")
     let cmd: Array[ByteSeq] val =
       ["PUBLISH"; "demo-channel"; "Hello from Pony!"]
@@ -73,8 +73,8 @@ actor PubSubDemo is
     """
     Called when a message is received on a subscribed channel.
     """
-    _out.print("Received message on '" + channel + "': "
-      + String.from_array(data))
+    _out.print("Received message on '" + channel + "': " +
+      String.from_array(data))
     _out.print("Unsubscribing...")
     let channels: Array[String] val = ["demo-channel"]
     _subscriber.unsubscribe(channels)
@@ -84,8 +84,8 @@ actor PubSubDemo is
     channel: String,
     count: USize)
   =>
-    _out.print("Unsubscribed from '" + channel + "' (remaining: "
-      + count.string() + ")")
+    _out.print("Unsubscribed from '" + channel + "' (remaining: " +
+      count.string() + ")")
     _subscriber.close()
     _publisher.close()
 
@@ -98,8 +98,8 @@ actor PubSubDemo is
   be redis_response(session: Session, response: RespValue) =>
     match response
     | let i: RespInteger =>
-      _out.print("Message delivered to " + i.value.string()
-        + " subscriber(s).")
+      _out.print("Message delivered to " + i.value.string() +
+        " subscriber(s).")
     end
 
   be redis_command_failed(
