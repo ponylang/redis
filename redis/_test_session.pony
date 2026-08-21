@@ -1873,6 +1873,9 @@ actor \nodoc\ _MutedServerConnection is
   fun ref _on_started() =>
     _connection().mute()
 
+  fun ref _on_start_failure(reason: lori.StartFailureReason) =>
+    _connection().hard_close()
+
 actor \nodoc\ _BackpressureOverflowClient is
   (SessionStatusNotify & ResultReceiver)
   let _h: TestHelper
