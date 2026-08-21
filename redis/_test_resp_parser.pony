@@ -101,11 +101,11 @@ class \nodoc\ iso _TestRespParserInvalidTypeByteErrors is Property1[U8]
 
   fun gen(): Generator[U8] =>
     Generators.u8().filter({(b) =>
-      let valid = (b == '+') or (b == '-') or (b == ':')
-        or (b == '$') or (b == '*')
-        or (b == '_') or (b == '#') or (b == ',') or (b == '(')
-        or (b == '!') or (b == '=') or (b == '%') or (b == '~')
-        or (b == '>')
+      let valid = (b == '+') or (b == '-') or (b == ':') or
+        (b == '$') or (b == '*') or
+        (b == '_') or (b == '#') or (b == ',') or (b == '(') or
+        (b == '!') or (b == '=') or (b == '%') or (b == '~') or
+        (b == '>')
       (b, not valid)
     })
 
@@ -468,8 +468,8 @@ class \nodoc\ iso _TestRespParserIntegerOverflow is UnitTest
     match \exhaustive\ _RespParser(max_buf)
     | None => None
     | let m: RespMalformed =>
-      h.fail("I64.max as bulk string length should not be malformed: "
-        + m.message)
+      h.fail("I64.max as bulk string length should not be malformed: " +
+        m.message)
     | let _: RespValue =>
       h.fail("I64.max as bulk string length should be incomplete, not a value")
     end

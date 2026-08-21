@@ -54,8 +54,8 @@ actor Client is (SessionStatusNotify & ResultReceiver)
       // HGETALL response — RespMap in RESP3, RespArray in RESP2.
       match response
       | let m: RespMap =>
-        _out.print("HGETALL returned a map with "
-          + m.pairs.size().string() + " pairs:")
+        _out.print("HGETALL returned a map with " +
+          m.pairs.size().string() + " pairs:")
         for (k, v) in m.pairs.values() do
           let ks =
             match k
@@ -71,8 +71,8 @@ actor Client is (SessionStatusNotify & ResultReceiver)
         end
       | let a: RespArray =>
         // Fallback to RESP2 — server didn't support HELLO.
-        _out.print("HGETALL returned an array (RESP2 fallback) with "
-          + a.values.size().string() + " elements.")
+        _out.print("HGETALL returned an array (RESP2 fallback) with " +
+          a.values.size().string() + " elements.")
       else
         _out.print("Unexpected response type from HGETALL.")
       end

@@ -692,8 +692,8 @@ actor \nodoc\ _PipelineCloseClient is (SessionStatusNotify & ResultReceiver)
         _h.complete(true)
       end
     else
-      _h.fail("Expected SessionClosed or SessionConnectionLost, got: "
-        + failure.message())
+      _h.fail("Expected SessionClosed or SessionConnectionLost, got: " +
+        failure.message())
       _h.complete(false)
     end
 
@@ -824,8 +824,8 @@ actor \nodoc\ _PubSubClient is
       return
     end
     if String.from_array(data) != "hello" then
-      _h.fail("Expected data 'hello', got: '"
-        + String.from_array(data) + "'")
+      _h.fail("Expected data 'hello', got: '" +
+        String.from_array(data) + "'")
       _h.complete(false)
       return
     end
@@ -923,20 +923,20 @@ actor \nodoc\ _PubSubPatternClient is
       data: Array[U8] val)
   =>
     if pattern != "_test_pubsub_p:*" then
-      _h.fail("Expected pattern '_test_pubsub_p:*', got: '"
-        + pattern + "'")
+      _h.fail("Expected pattern '_test_pubsub_p:*', got: '" +
+        pattern + "'")
       _h.complete(false)
       return
     end
     if channel != "_test_pubsub_p:foo" then
-      _h.fail("Expected channel '_test_pubsub_p:foo', got: '"
-        + channel + "'")
+      _h.fail("Expected channel '_test_pubsub_p:foo', got: '" +
+        channel + "'")
       _h.complete(false)
       return
     end
     if String.from_array(data) != "hello" then
-      _h.fail("Expected data 'hello', got: '"
-        + String.from_array(data) + "'")
+      _h.fail("Expected data 'hello', got: '" +
+        String.from_array(data) + "'")
       _h.complete(false)
       return
     end
@@ -1027,8 +1027,8 @@ actor \nodoc\ _ExecuteWhileSubscribedClient is
       let channels: Array[String] val = ["_test_exec_subscribed"]
       session.unsubscribe(channels)
     else
-      _h.fail("Expected SessionInSubscribedMode, got: "
-        + failure.message())
+      _h.fail("Expected SessionInSubscribedMode, got: " +
+        failure.message())
       _h.complete(false)
     end
 
@@ -1239,8 +1239,8 @@ actor \nodoc\ _PipelineDrainClient is
   =>
     // Subscribe confirmation arrived after pending commands were drained.
     if channel != "_test_pipeline_drain_ch" then
-      _h.fail("Expected channel '_test_pipeline_drain_ch', got: '"
-        + channel + "'")
+      _h.fail("Expected channel '_test_pipeline_drain_ch', got: '" +
+        channel + "'")
       _h.complete(false)
       return
     end
