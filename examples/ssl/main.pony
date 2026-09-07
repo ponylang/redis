@@ -1,7 +1,6 @@
 use "cli"
 use "files"
 use lori = "lori"
-use "ssl/net"
 // in your code this `use` statement would be:
 // use "redis"
 use "../../redis"
@@ -19,9 +18,9 @@ actor Main
     let auth = lori.TCPConnectAuth(env.root)
     let file_auth = FileAuth(env.root)
     try
-      let sslctx: SSLContext val =
+      let sslctx: lori.SSLContext val =
         recover val
-          SSLContext
+          lori.SSLContext
             .> set_authority(FilePath(file_auth, info.ca_path))?
         end
       Client(auth, info, sslctx, env.out)
@@ -40,7 +39,7 @@ actor Client is (SessionStatusNotify & ResultReceiver)
   new create(
     auth: lori.TCPConnectAuth,
     info: ServerInfo,
-    sslctx: SSLContext val,
+    sslctx: lori.SSLContext val,
     out: OutStream)
   =>
     _out = out

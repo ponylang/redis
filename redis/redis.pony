@@ -90,12 +90,10 @@ Redis AUTH sends the password in plaintext over TCP. Use `SSLRequired` to
 encrypt the connection:
 
 ```pony
-use "ssl/net"
-
-// SSLContext.set_authority() is partial
-let sslctx: SSLContext val =
+// lori.SSLContext.set_authority() is partial
+let sslctx: lori.SSLContext val =
   recover val
-    SSLContext
+    lori.SSLContext
       .> set_authority(FilePath(file_auth, "/path/to/ca.pem"))?
   end
 let info = ConnectInfo(auth, host, "6380" where

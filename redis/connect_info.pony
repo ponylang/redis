@@ -5,19 +5,19 @@ class val ConnectInfo
   Connection configuration for a Redis session.
 
   The default `ssl_mode` is `SSLDisabled` (plaintext TCP). To connect
-  over TLS, pass `SSLRequired` with a configured `SSLContext`:
+  over TLS, pass `SSLRequired` with a configured `lori.SSLContext`:
 
   ```pony
-  let sslctx: SSLContext val =
+  let sslctx: lori.SSLContext val =
     recover val
-      SSLContext
+      lori.SSLContext
         .> set_authority(FilePath(file_auth, "/path/to/ca.pem"))?
     end
   let info = ConnectInfo(auth, host, "6380" where
     ssl_mode' = SSLRequired(sslctx))
   ```
 
-  Note: `SSLContext.set_authority()` is partial — the above must be in
+  Note: `lori.SSLContext.set_authority()` is partial — the above must be in
   a partial context or wrapped in `try`.
 
   To use RESP3 protocol features (maps, sets, booleans, doubles), set
