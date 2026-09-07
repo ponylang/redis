@@ -45,7 +45,7 @@ make stop-redis                      # stop and remove them
 make clean                           # clean build artifacts
 ```
 
-`ssl=` is required on build targets (lori pulls in `ssl`), set to your installed TLS library: `4.0.x`, `3.0.x`, `1.1.x`, or `libressl`. Add `config=debug` for a debug build.
+`ssl=` is required on build targets (lori links against OpenSSL/LibreSSL), set to your installed TLS library: `4.0.x`, `3.0.x`, `1.1.x`, or `libressl`. Add `config=debug` for a debug build.
 
 Run the integration tests locally with `make start-redis`, then `make test ssl=3.0.x`, then `make stop-redis`. They read `REDIS_*` environment variables (see `_RedisTestConfiguration`), which default to `127.0.0.2` on Linux rather than the usual loopback, dodging the WSL2 mirrored-networking hang.
 

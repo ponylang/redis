@@ -2,7 +2,6 @@ use "cli"
 use "collections"
 use lori = "lori"
 use "pony_test"
-use "ssl/net"
 
 class \nodoc\ val _RedisTestConfiguration
   let host: String
@@ -1294,8 +1293,8 @@ class \nodoc\ iso _TestSessionSSLConnectionFailure is UnitTest
     // SSL-to-plaintext causes a deadlock: the ClientHello has no \r\n
     // so Redis waits for more data, while SSL waits for a ServerHello.
     let host = ifdef linux then "127.0.0.2" else "localhost" end
-    let sslctx: SSLContext val =
-      recover val SSLContext end
+    let sslctx: lori.SSLContext val =
+      recover val lori.SSLContext end
     let session =
       Session(
         ConnectInfo(
@@ -1339,9 +1338,9 @@ class \nodoc\ iso _TestSessionSSLConnectAndReady is UnitTest
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
-    let sslctx: SSLContext val =
+    let sslctx: lori.SSLContext val =
       recover val
-        SSLContext
+        lori.SSLContext
           .> set_client_verify(false)
           .> set_server_verify(false)
       end
@@ -1388,9 +1387,9 @@ class \nodoc\ iso _TestSessionSSLSetAndGet is UnitTest
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
     let auth = lori.TCPConnectAuth(h.env.root)
-    let sslctx: SSLContext val =
+    let sslctx: lori.SSLContext val =
       recover val
-        SSLContext
+        lori.SSLContext
           .> set_client_verify(false)
           .> set_server_verify(false)
       end
