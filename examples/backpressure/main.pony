@@ -1,5 +1,5 @@
 use "cli"
-use lori = "lori"
+use "net"
 // in your code this `use` statement would be:
 // use "redis"
 use "../../redis"
@@ -7,7 +7,7 @@ use "../../redis"
 actor Main
   new create(env: Env) =>
     let info = ServerInfo(env.vars)
-    let auth = lori.TCPConnectAuth(env.root)
+    let auth = TCPConnectAuth(env.root)
     Client(auth, info, env.out)
 
 actor Client is (SessionStatusNotify & ResultReceiver)
@@ -21,7 +21,7 @@ actor Client is (SessionStatusNotify & ResultReceiver)
   var _received: USize = 0
   var _rejected: USize = 0
 
-  new create(auth: lori.TCPConnectAuth, info: ServerInfo, out: OutStream) =>
+  new create(auth: TCPConnectAuth, info: ServerInfo, out: OutStream) =>
     _out = out
     // Use a small buffer limit so that overflow is likely during the burst.
     _session =

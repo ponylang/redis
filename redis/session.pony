@@ -1,7 +1,7 @@
 use "buffered"
-use lori = "lori"
+use "net"
 
-actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
+actor Session is (TCPConnectionActor & ClientLifecycleEventReceiver)
   """
   A Redis client session. Manages the connection lifecycle — connecting,
   optionally authenticating, executing commands, subscribing to pub/sub
@@ -28,14 +28,14 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
   `redis_session_ready` fires again.
   """
   var state: _SessionState
-  var _tcp_connection: lori.TCPConnection = lori.TCPConnection.none()
+  var _tcp_connection: TCPConnection = TCPConnection.none()
 
   new create(connect_info': ConnectInfo, notify': SessionStatusNotify) =>
     state = _SessionUnopened(notify', connect_info')
     _tcp_connection =
       match \exhaustive\ connect_info'.ssl_mode
       | SSLDisabled =>
-        lori.TCPConnection.client(
+        TCPConnection.client(
           connect_info'.auth,
           connect_info'.host,
           connect_info'.port,
@@ -43,7 +43,7 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
           this,
           this)
       | let ssl: SSLRequired =>
-        lori.TCPConnection.ssl_client(
+        TCPConnection.ssl_client(
           connect_info'.auth,
           ssl.ctx,
           connect_info'.host,
@@ -113,26 +113,15 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
     """
     state.punsubscribe(this, patterns)
 
-  // Lori callbacks — delegate to state machine.
   fun ref _on_connected() =>
     state.on_connected(this)
 
-  fun ref _on_connection_failure(reason: lori.ConnectionFailureReason) =>
-    let r: ConnectionFailureReason =
-      match \exhaustive\ reason
-      | let _: lori.ConnectionFailedDNS => ConnectionFailedDNS
-      | let _: lori.ConnectionFailedTCP => ConnectionFailedTCP
-      | let _: lori.ConnectionFailedSSL => ConnectionFailedSSL
-      | let _: lori.ConnectionFailedTimeout =>
-        ConnectionFailedTimeout
-      | let _: lori.ConnectionFailedTimerError =>
-        ConnectionFailedTimerError
-      end
-    state.on_failure(this, r)
+  fun ref _on_connection_failure(reason: ConnectionFailureReason) =>
+    state.on_failure(this, reason)
 
-  fun ref _on_received(data: Array[U8] iso): lori.ReadAction =>
+  fun ref _on_received(data: Array[U8] iso): ReadAction =>
     state.on_received(this, consume data)
-    lori.KeepReading
+    KeepReading
 
   fun ref _on_closed() =>
     state.on_closed(this)
@@ -152,11 +141,11 @@ actor Session is (lori.TCPConnectionActor & lori.ClientLifecycleEventReceiver)
   be _flush_backpressure() =>
     """
     Deferred flush of the backpressure send buffer. Triggered by
-    on_unthrottled to avoid calling send() from within lori's pending
+    on_unthrottled to avoid calling send() from within net's pending
     writes processing.
     """
     state.flush_send_buffer(this)
 
-  fun ref _connection(): lori.TCPConnection =>
+  fun ref _connection(): TCPConnection =>
     _tcp_connection
 

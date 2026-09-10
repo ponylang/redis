@@ -1,5 +1,5 @@
 use "buffered"
-use lori = "lori"
+use "net"
 
 class ref _SessionConnected is
   (_ConnectedState & _NotReadyForCommands & _NotSubscribed & _NotThrottleable)

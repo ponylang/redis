@@ -1,5 +1,5 @@
 use "buffered"
-use lori = "lori"
+use "net"
 
 class ref _SessionNegotiating is
   (_ConnectedState & _NotReadyForCommands & _NotSubscribed & _NotThrottleable)
@@ -37,7 +37,7 @@ class ref _SessionNegotiating is
         let cmd = _BuildAuthCommand(_connect_info.username, password)
         let data = _RespSerializer(cmd)
         match s._connection().send(data)
-        | lori.SendAccepted =>
+        | SendAccepted =>
           s.state =
             _SessionConnected.from_negotiating(
               _notify,
