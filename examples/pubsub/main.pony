@@ -1,5 +1,5 @@
 use "cli"
-use lori = "lori"
+use "net"
 // in your code this `use` statement would be:
 // use "redis"
 use "../../redis"
@@ -7,7 +7,7 @@ use "../../redis"
 actor Main
   new create(env: Env) =>
     let info = ServerInfo(env.vars)
-    let auth = lori.TCPConnectAuth(env.root)
+    let auth = TCPConnectAuth(env.root)
     PubSubDemo(auth, info, env.out)
 
 actor PubSubDemo is
@@ -22,7 +22,7 @@ actor PubSubDemo is
   var _publisher_ready: Bool = false
 
   new create(
-    auth: lori.TCPConnectAuth,
+    auth: TCPConnectAuth,
     info: ServerInfo,
     out: OutStream)
   =>

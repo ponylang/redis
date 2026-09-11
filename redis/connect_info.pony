@@ -1,23 +1,23 @@
-use lori = "lori"
+use "net"
 
 class val ConnectInfo
   """
   Connection configuration for a Redis session.
 
   The default `ssl_mode` is `SSLDisabled` (plaintext TCP). To connect
-  over TLS, pass `SSLRequired` with a configured `lori.SSLContext`:
+  over TLS, pass `SSLRequired` with a configured `SSLContext`:
 
   ```pony
-  let sslctx: lori.SSLContext val =
+  let sslctx: SSLContext val =
     recover val
-      lori.SSLContext
+      SSLContext
         .> set_authority(FilePath(file_auth, "/path/to/ca.pem"))?
     end
   let info = ConnectInfo(auth, host, "6380" where
     ssl_mode' = SSLRequired(sslctx))
   ```
 
-  Note: `lori.SSLContext.set_authority()` is partial — the above must be in
+  Note: `SSLContext.set_authority()` is partial — the above must be in
   a partial context or wrapped in `try`.
 
   To use RESP3 protocol features (maps, sets, booleans, doubles), set
@@ -41,7 +41,7 @@ class val ConnectInfo
   `redis_command_failed` with `SessionBackpressureOverflow`. Set a
   higher limit for bursty workloads or a lower limit to fail fast.
   """
-  let auth: lori.TCPConnectAuth
+  let auth: TCPConnectAuth
   let host: String
   let port: String
   let password: (String | None)
@@ -51,7 +51,7 @@ class val ConnectInfo
   let send_buffer_limit: USize
 
   new val create(
-    auth': lori.TCPConnectAuth,
+    auth': TCPConnectAuth,
     host': String,
     port': String = "6379",
     password': (String | None) = None,

@@ -13,7 +13,7 @@ actor MyApp is (SessionStatusNotify & ResultReceiver)
   let _session: Session
 
   new create(env: Env) =>
-    let auth = lori.TCPConnectAuth(env.root)
+    let auth = TCPConnectAuth(env.root)
     _session = Session(ConnectInfo(auth, "localhost"), this)
 
   be redis_session_ready(session: Session) =>
@@ -59,7 +59,7 @@ actor MySubscriber is (SessionStatusNotify & SubscriptionNotify)
   let _session: Session
 
   new create(env: Env) =>
-    let auth = lori.TCPConnectAuth(env.root)
+    let auth = TCPConnectAuth(env.root)
     _session = Session(ConnectInfo(auth, "localhost"), this)
 
   be redis_session_ready(session: Session) =>
@@ -90,10 +90,10 @@ Redis AUTH sends the password in plaintext over TCP. Use `SSLRequired` to
 encrypt the connection:
 
 ```pony
-// lori.SSLContext.set_authority() is partial
-let sslctx: lori.SSLContext val =
+// SSLContext.set_authority() is partial
+let sslctx: SSLContext val =
   recover val
-    lori.SSLContext
+    SSLContext
       .> set_authority(FilePath(file_auth, "/path/to/ca.pem"))?
   end
 let info = ConnectInfo(auth, host, "6380" where

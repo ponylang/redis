@@ -1,5 +1,5 @@
 use "buffered"
-use lori = "lori"
+use "net"
 
 class ref _SessionReady is (_ConnectedState & _NotSubscribed)
   """
@@ -75,15 +75,15 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     else
       let data = _RespSerializer(command)
       match \exhaustive\ s._connection().send(data)
-      | lori.SendAccepted =>
+      | SendAccepted =>
         _pending.push(_QueuedCommand(command, receiver))
-      | lori.SendErrorNotWriteable =>
+      | SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(
           _BufferedSend(data, _QueuedCommand(command, receiver))
         )
         _notify.redis_session_throttled(s)
-      | lori.SendErrorNotConnected =>
+      | SendErrorNotConnected =>
         receiver.redis_command_failed(s, command, SessionConnectionLost)
         shutdown(s, SessionConnectionLost)
       end
@@ -135,15 +135,15 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
       try
         let buffered = _send_buffer.shift()?
         match \exhaustive\ s._connection().send(buffered.data)
-        | lori.SendAccepted =>
+        | SendAccepted =>
           match buffered.queued
           | let qc: _QueuedCommand => _pending.push(qc)
           end
-        | lori.SendErrorNotWriteable =>
+        | SendErrorNotWriteable =>
           _send_buffer.unshift(buffered)
           _throttled = true
           return
-        | lori.SendErrorNotConnected =>
+        | SendErrorNotConnected =>
           _send_buffer.unshift(buffered)
           shutdown(s, SessionConnectionLost)
           return
@@ -177,12 +177,12 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     else
       let data = _RespSerializer(cmd)
       match \exhaustive\ s._connection().send(data)
-      | lori.SendAccepted => None
-      | lori.SendErrorNotWriteable =>
+      | SendAccepted => None
+      | SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(_BufferedSend(data))
         _notify.redis_session_throttled(s)
-      | lori.SendErrorNotConnected =>
+      | SendErrorNotConnected =>
         shutdown(s, SessionConnectionLost)
         return
       end
@@ -216,12 +216,12 @@ class ref _SessionReady is (_ConnectedState & _NotSubscribed)
     else
       let data = _RespSerializer(cmd)
       match \exhaustive\ s._connection().send(data)
-      | lori.SendAccepted => None
-      | lori.SendErrorNotWriteable =>
+      | SendAccepted => None
+      | SendErrorNotWriteable =>
         _throttled = true
         _send_buffer.push(_BufferedSend(data))
         _notify.redis_session_throttled(s)
-      | lori.SendErrorNotConnected =>
+      | SendErrorNotConnected =>
         shutdown(s, SessionConnectionLost)
         return
       end

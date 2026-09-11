@@ -1,6 +1,6 @@
 use "cli"
 use "collections"
-use lori = "lori"
+use "net"
 use "pony_test"
 
 class \nodoc\ val _RedisTestConfiguration
@@ -34,7 +34,7 @@ class \nodoc\ iso _TestSessionConnectAndReady is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let session =
       Session(
         ConnectInfo(auth, info.host, info.port),
@@ -75,7 +75,7 @@ class \nodoc\ iso _TestSessionSetAndGet is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _SetAndGetClient(h)
     let session =
       Session(
@@ -168,7 +168,7 @@ class \nodoc\ iso _TestSessionConnectionFailure is UnitTest
   fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     // Connect to a port that is (almost certainly) not listening.
     let host = ifdef linux then "127.0.0.2" else "localhost" end
     let session =
@@ -211,7 +211,7 @@ class \nodoc\ iso _TestSessionExecuteBeforeReady is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _ExecuteBeforeReadyClient(h)
     let session =
       Session(
@@ -264,7 +264,7 @@ class \nodoc\ iso _TestSessionExecuteAfterClose is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _ExecuteAfterCloseClient(h)
     let session =
       Session(
@@ -318,7 +318,7 @@ class \nodoc\ iso _TestSessionMultipleCommands is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _MultipleCommandsClient(h)
     let session =
       Session(
@@ -424,7 +424,7 @@ class \nodoc\ iso _TestSessionPipeline is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _PipelineClient(h)
     let session =
       Session(
@@ -529,7 +529,7 @@ class \nodoc\ iso _TestSessionPipelineMixedResponses is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _PipelineMixedClient(h)
     let session =
       Session(
@@ -637,7 +637,7 @@ class \nodoc\ iso _TestSessionPipelineClose is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _PipelineCloseClient(h)
     let session =
       Session(
@@ -674,7 +674,7 @@ actor \nodoc\ _PipelineCloseClient is (SessionStatusNotify & ResultReceiver)
       failure: ClientError)
   =>
     // Both SessionClosed and SessionConnectionLost are valid here:
-    // close() drains pending with SessionClosed, but if lori's
+    // close() drains pending with SessionClosed, but if net's
     // on_closed fires first, pending is drained with
     // SessionConnectionLost instead. Which happens depends on
     // whether the close behavior or the connection drop is
@@ -712,7 +712,7 @@ class \nodoc\ iso _TestSessionServerError is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _ServerErrorClient(h)
     let session =
       Session(
@@ -773,7 +773,7 @@ class \nodoc\ iso _TestSessionPubSub is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     _PubSubClient(h, auth, info.host, info.port)
     h.long_test(5_000_000_000)
 
@@ -787,7 +787,7 @@ actor \nodoc\ _PubSubClient is
 
   new create(
       h: TestHelper,
-      auth: lori.TCPConnectAuth,
+      auth: TCPConnectAuth,
       host: String,
       port: String)
   =>
@@ -875,7 +875,7 @@ class \nodoc\ iso _TestSessionPubSubPattern is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     _PubSubPatternClient(h, auth, info.host, info.port)
     h.long_test(5_000_000_000)
 
@@ -889,7 +889,7 @@ actor \nodoc\ _PubSubPatternClient is
 
   new create(
       h: TestHelper,
-      auth: lori.TCPConnectAuth,
+      auth: TCPConnectAuth,
       host: String,
       port: String)
   =>
@@ -986,7 +986,7 @@ class \nodoc\ iso _TestSessionExecuteWhileSubscribed is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _ExecuteWhileSubscribedClient(h)
     let session =
       Session(
@@ -1067,7 +1067,7 @@ class \nodoc\ iso _TestSessionPubSubBackToReady is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _PubSubBackToReadyClient(h)
     let session =
       Session(
@@ -1159,7 +1159,7 @@ class \nodoc\ iso _TestSessionPipelineDrain is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _PipelineDrainClient(h)
     let session =
       Session(
@@ -1285,7 +1285,7 @@ class \nodoc\ iso _TestSessionSSLConnectionFailure is UnitTest
   fun exclusion_group(): String => "integration"
 
   fun apply(h: TestHelper) =>
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     // Connect with SSL to a port with nothing listening. This exercises
     // the SSL constructor path (Session calls ssl_client instead of
     // client) and verifies connection failure is reported through the
@@ -1293,8 +1293,8 @@ class \nodoc\ iso _TestSessionSSLConnectionFailure is UnitTest
     // SSL-to-plaintext causes a deadlock: the ClientHello has no \r\n
     // so Redis waits for more data, while SSL waits for a ServerHello.
     let host = ifdef linux then "127.0.0.2" else "localhost" end
-    let sslctx: lori.SSLContext val =
-      recover val lori.SSLContext end
+    let sslctx: SSLContext val =
+      recover val SSLContext end
     let session =
       Session(
         ConnectInfo(
@@ -1337,10 +1337,10 @@ class \nodoc\ iso _TestSessionSSLConnectAndReady is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
-    let sslctx: lori.SSLContext val =
+    let auth = TCPConnectAuth(h.env.root)
+    let sslctx: SSLContext val =
       recover val
-        lori.SSLContext
+        SSLContext
           .> set_client_verify(false)
           .> set_server_verify(false)
       end
@@ -1386,10 +1386,10 @@ class \nodoc\ iso _TestSessionSSLSetAndGet is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
-    let sslctx: lori.SSLContext val =
+    let auth = TCPConnectAuth(h.env.root)
+    let sslctx: SSLContext val =
       recover val
-        lori.SSLContext
+        SSLContext
           .> set_client_verify(false)
           .> set_server_verify(false)
       end
@@ -1488,7 +1488,7 @@ class \nodoc\ iso _TestSessionResp3ConnectAndReady is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let session =
       Session(
         ConnectInfo(auth, info.host, info.port where protocol' = Resp3),
@@ -1529,7 +1529,7 @@ class \nodoc\ iso _TestSessionResp3SetAndGet is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _Resp3SetAndGetClient(h)
     let session =
       Session(
@@ -1624,7 +1624,7 @@ class \nodoc\ iso _TestSessionResp3FallbackToResp2 is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _Resp3FallbackClient(h)
     let session =
       Session(
@@ -1721,7 +1721,7 @@ class \nodoc\ iso _TestCommandAPISetAndGet is UnitTest
 
   fun apply(h: TestHelper) =>
     let info = _RedisTestConfiguration(h.env.vars)
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
     let client = _CommandAPISetAndGetClient(h)
     let session =
       Session(
@@ -1797,7 +1797,7 @@ actor \nodoc\ _CommandAPISetAndGetClient is
 
 // Session/BackpressureOverflow
 //
-// Uses a fake Redis server (lori listener + muted connection) to
+// Uses a fake Redis server (net listener + muted connection) to
 // deterministically trigger TCP backpressure. The server accepts a connection
 // then mutes itself so it never reads data. With RESP2 and no password the
 // session goes straight to _SessionReady without needing a server response.
@@ -1815,12 +1815,12 @@ class \nodoc\ iso _TestSessionBackpressureOverflow is UnitTest
     h.dispose_when_done(listener)
     h.long_test(30_000_000_000)
 
-actor \nodoc\ _MutedServerListener is lori.TCPListenerActor
+actor \nodoc\ _MutedServerListener is TCPListenerActor
   let _h: TestHelper
   let _auth: AmbientAuth
   let _host: String
   let _port: String
-  var _tcp_listener: lori.TCPListener = lori.TCPListener.none()
+  var _tcp_listener: TCPListener = TCPListener.none()
   let _connections: Array[_MutedServerConnection] =
     Array[_MutedServerConnection]
 
@@ -1830,18 +1830,18 @@ actor \nodoc\ _MutedServerListener is lori.TCPListenerActor
     _host = host
     _port = port
     _tcp_listener =
-      lori.TCPListener(
-        lori.TCPListenAuth(auth), host, port, this)
+      TCPListener(
+        TCPListenAuth(auth), host, port, this)
 
-  fun ref _listener(): lori.TCPListener => _tcp_listener
+  fun ref _listener(): TCPListener => _tcp_listener
 
-  fun ref _on_accept(fd: U32): lori.TCPConnectionActor =>
-    let conn = _MutedServerConnection(lori.TCPServerAuth(_auth), fd)
+  fun ref _on_accept(fd: U32): TCPConnectionActor =>
+    let conn = _MutedServerConnection(TCPServerAuth(_auth), fd)
     _connections.push(conn)
     conn
 
   fun ref _on_listening() =>
-    let connect_auth = lori.TCPConnectAuth(_auth)
+    let connect_auth = TCPConnectAuth(_auth)
     let client = _BackpressureOverflowClient(_h, this)
     let session =
       Session(
@@ -1861,18 +1861,18 @@ actor \nodoc\ _MutedServerListener is lori.TCPListenerActor
     end
 
 actor \nodoc\ _MutedServerConnection is
-  (lori.TCPConnectionActor & lori.ServerLifecycleEventReceiver)
-  var _tcp_connection: lori.TCPConnection = lori.TCPConnection.none()
+  (TCPConnectionActor & ServerLifecycleEventReceiver)
+  var _tcp_connection: TCPConnection = TCPConnection.none()
 
-  new create(auth: lori.TCPServerAuth, fd: U32) =>
-    _tcp_connection = lori.TCPConnection.server(auth, fd, this, this)
+  new create(auth: TCPServerAuth, fd: U32) =>
+    _tcp_connection = TCPConnection.server(auth, fd, this, this)
 
-  fun ref _connection(): lori.TCPConnection => _tcp_connection
+  fun ref _connection(): TCPConnection => _tcp_connection
 
   fun ref _on_started() =>
     _connection().mute()
 
-  fun ref _on_start_failure(reason: lori.StartFailureReason) =>
+  fun ref _on_start_failure(reason: StartFailureReason) =>
     _connection().hard_close()
 
 actor \nodoc\ _BackpressureOverflowClient is
@@ -1944,7 +1944,7 @@ class \nodoc\ iso _TestBuildHelloCommand is UnitTest
   fun name(): String => "BuildHelloCommand"
 
   fun apply(h: TestHelper) ? =>
-    let auth = lori.TCPConnectAuth(h.env.root)
+    let auth = TCPConnectAuth(h.env.root)
 
     // No password: ["HELLO"; "3"]
     let no_pw = ConnectInfo(auth, "localhost" where protocol' = Resp3)

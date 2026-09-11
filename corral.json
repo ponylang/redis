@@ -11,9 +11,5 @@
     "name": "redis"
   },
   "deps": [
-    {
-      "locator": "github.com/ponylang/lori.git",
-      "version": "0.22.0"
-    }
   ]
 }

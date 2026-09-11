@@ -1,3 +1,5 @@
+use "net"
+
 interface tag SessionStatusNotify
   """
   Receives session lifecycle events: connection, authentication, and

@@ -8,14 +8,14 @@ This library is under active development. The API is not yet stable.
 
 ## Installation
 
-* Requires ponyc 0.70.0 or later.
+* Requires ponyc 0.72.0 or later.
 * Install [corral](https://github.com/ponylang/corral)
 * `corral add github.com/ponylang/redis.git --version 0.0.0`
 * `corral fetch` to fetch your dependencies
 * `use "redis"` to include this package
 * `corral run -- ponyc` to compile your application
 
-This library has a transitive dependency on [ponylang/ssl](https://github.com/ponylang/ssl). It requires a C SSL library to be installed. Please see the [ssl installation instructions](https://github.com/ponylang/ssl?tab=readme-ov-file#installation) for more information.
+SSL support in ponyc's stdlib requires a C SSL library to be installed. Please see ponyc's BUILD.md for details.
 
 ## API Documentation
 

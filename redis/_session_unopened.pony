@@ -1,5 +1,5 @@
 use "buffered"
-use lori = "lori"
+use "net"
 
 class ref _SessionUnopened is
   (_NotReadyForCommands & _NotSubscribed & _NotThrottleable)
@@ -20,7 +20,7 @@ class ref _SessionUnopened is
       let cmd = _BuildHelloCommand(_connect_info)
       let data = _RespSerializer(cmd)
       match s._connection().send(data)
-      | lori.SendAccepted =>
+      | SendAccepted =>
         s.state = _SessionNegotiating(_notify, _connect_info)
       else
         s._connection().close()
@@ -33,7 +33,7 @@ class ref _SessionUnopened is
         let cmd = _BuildAuthCommand(_connect_info.username, password)
         let data = _RespSerializer(cmd)
         match s._connection().send(data)
-        | lori.SendAccepted =>
+        | SendAccepted =>
           s.state =
             _SessionConnected(
               _notify,
@@ -65,7 +65,7 @@ class ref _SessionUnopened is
     _IllegalState()
 
   fun ref on_closed(s: Session ref) =>
-    // Defensive — lori fires _on_closed only for established connections,
+    // Defensive — net fires _on_closed only for established connections,
     // so this is unlikely to be reached from _SessionUnopened.
     s.state = _SessionClosed
     _notify.redis_session_closed(s)

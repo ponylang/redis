@@ -1,4 +1,4 @@
-use lori = "lori"
+use "net"
 
 type SSLMode is (SSLDisabled | SSLRequired)
 
@@ -9,11 +9,11 @@ primitive SSLDisabled
 
 class val SSLRequired
   """
-  SSL/TLS connection. Wraps an `lori.SSLContext val` configured by the caller.
+  SSL/TLS connection. Wraps an `SSLContext val` configured by the caller.
   Redis uses direct TLS (typically port 6380) rather than STARTTLS, so
   the SSL handshake happens during TCP connection establishment.
   """
-  let ctx: lori.SSLContext val
+  let ctx: SSLContext val
 
-  new val create(ctx': lori.SSLContext val) =>
+  new val create(ctx': SSLContext val) =>
     ctx = ctx'

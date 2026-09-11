@@ -1,4 +1,5 @@
 use "buffered"
+use "net"
 
 interface _SessionState
   fun on_connected(s: Session ref)
@@ -155,7 +156,7 @@ trait _NotThrottleable is _SessionState
   """
   Mixin for states where backpressure events are no-ops. States that don't
   send user commands (pre-ready states, closed state) ignore throttle and
-  unthrottle — lori manages partial writes internally during negotiation,
+  unthrottle — net manages partial writes internally during negotiation,
   and no application commands are pending in those states.
   """
   fun ref on_throttled(s: Session ref) => None
