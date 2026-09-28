@@ -1,12 +1,11 @@
 use "buffered"
 use "collections"
-use "pony_check"
 use "pony_test"
 
 // ---------------------------------------------------------------------------
 // Parser property-based tests
 // ---------------------------------------------------------------------------
-class \nodoc\ iso _TestRespParserRoundtrip is Property1[RespValue]
+class \nodoc\ iso _TestRespParserRoundtrip is Property[RespValue]
   """
   Verify that serialize -> parse -> compare produces the original value
   for all generated RespValues.
@@ -30,7 +29,7 @@ class \nodoc\ iso _TestRespParserRoundtrip is Property1[RespValue]
       h.fail("Complete serialized value was malformed: " + m.message)
     end
 
-class \nodoc\ iso _TestRespParserValidBytesAlwaysParse is Property1[RespValue]
+class \nodoc\ iso _TestRespParserValidBytesAlwaysParse is Property[RespValue]
   """
   Verify that serialized RespValues always parse successfully (never
   return None, never return RespMalformed).
@@ -49,7 +48,7 @@ class \nodoc\ iso _TestRespParserValidBytesAlwaysParse is Property1[RespValue]
       h.fail("Valid RESP bytes were malformed: " + m.message)
     end
 
-class \nodoc\ iso _TestRespParserIncompleteReturnsNone is Property1[RespValue]
+class \nodoc\ iso _TestRespParserIncompleteReturnsNone is Property[RespValue]
   """
   Verify that every proper prefix of a serialized RespValue parses as None
   (incomplete), not as a valid value and not as malformed.
@@ -92,7 +91,7 @@ class \nodoc\ iso _TestRespParserIncompleteReturnsNone is Property1[RespValue]
       prefix_len = prefix_len + 1
     end
 
-class \nodoc\ iso _TestRespParserInvalidTypeByteErrors is Property1[U8]
+class \nodoc\ iso _TestRespParserInvalidTypeByteErrors is Property[U8]
   """
   Verify that bytes with an invalid RESP type marker always return
   RespMalformed.

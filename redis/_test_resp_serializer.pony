@@ -1,5 +1,4 @@
 use "buffered"
-use "pony_check"
 use "pony_test"
 
 // ---------------------------------------------------------------------------
@@ -491,7 +490,7 @@ primitive _RespGens
 // Serializer property-based tests
 // ---------------------------------------------------------------------------
 class \nodoc\ iso _TestRespSerializerCommandRoundtrip is
-  Property1[Array[ByteSeq] val]
+  Property[Array[ByteSeq] val]
   """
   Verify that serialized commands parse back to a RespArray of RespBulkStrings
   matching the original input.
@@ -537,7 +536,7 @@ class \nodoc\ iso _TestRespSerializerCommandRoundtrip is
     end
 
 class \nodoc\ iso _TestRespSerializerOutputIsValidResp is
-  Property1[Array[ByteSeq] val]
+  Property[Array[ByteSeq] val]
   """
   Verify that _RespSerializer output always parses successfully.
   """

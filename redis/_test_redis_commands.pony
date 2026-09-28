@@ -1,4 +1,3 @@
-use "pony_check"
 use "pony_test"
 
 // ---------------------------------------------------------------------------
@@ -18,7 +17,7 @@ primitive _ByteSeqString
 // Command builder property-based tests — key-list pattern
 // ---------------------------------------------------------------------------
 class \nodoc\ iso _TestRedisKeyDelProperty is
-  Property1[Array[String] val]
+  Property[Array[String] val]
   fun name(): String => "RedisKey/del/Property"
 
   fun gen(): Generator[Array[String] val] =>
@@ -37,7 +36,7 @@ class \nodoc\ iso _TestRedisKeyDelProperty is
     end
 
 class \nodoc\ iso _TestRedisKeyExistsProperty is
-  Property1[Array[String] val]
+  Property[Array[String] val]
   fun name(): String => "RedisKey/exists/Property"
 
   fun gen(): Generator[Array[String] val] =>
@@ -56,7 +55,7 @@ class \nodoc\ iso _TestRedisKeyExistsProperty is
     end
 
 class \nodoc\ iso _TestRedisStringMgetProperty is
-  Property1[Array[String] val]
+  Property[Array[String] val]
   fun name(): String => "RedisString/mget/Property"
 
   fun gen(): Generator[Array[String] val] =>
@@ -78,7 +77,7 @@ class \nodoc\ iso _TestRedisStringMgetProperty is
 // Command builder property-based tests — key-then-members pattern
 // ---------------------------------------------------------------------------
 class \nodoc\ iso _TestRedisListLpushProperty is
-  Property1[(String, Array[String] val)]
+  Property[(String, Array[String] val)]
   fun name(): String => "RedisList/lpush/Property"
 
   fun gen(): Generator[(String, Array[String] val)] =>
@@ -103,7 +102,7 @@ class \nodoc\ iso _TestRedisListLpushProperty is
     end
 
 class \nodoc\ iso _TestRedisListRpushProperty is
-  Property1[(String, Array[String] val)]
+  Property[(String, Array[String] val)]
   fun name(): String => "RedisList/rpush/Property"
 
   fun gen(): Generator[(String, Array[String] val)] =>
@@ -128,7 +127,7 @@ class \nodoc\ iso _TestRedisListRpushProperty is
     end
 
 class \nodoc\ iso _TestRedisSetSaddProperty is
-  Property1[(String, Array[String] val)]
+  Property[(String, Array[String] val)]
   fun name(): String => "RedisSet/sadd/Property"
 
   fun gen(): Generator[(String, Array[String] val)] =>
@@ -153,7 +152,7 @@ class \nodoc\ iso _TestRedisSetSaddProperty is
     end
 
 class \nodoc\ iso _TestRedisSetSremProperty is
-  Property1[(String, Array[String] val)]
+  Property[(String, Array[String] val)]
   fun name(): String => "RedisSet/srem/Property"
 
   fun gen(): Generator[(String, Array[String] val)] =>
@@ -178,7 +177,7 @@ class \nodoc\ iso _TestRedisSetSremProperty is
     end
 
 class \nodoc\ iso _TestRedisHashHdelProperty is
-  Property1[(String, Array[String] val)]
+  Property[(String, Array[String] val)]
   fun name(): String => "RedisHash/hdel/Property"
 
   fun gen(): Generator[(String, Array[String] val)] =>
@@ -206,7 +205,7 @@ class \nodoc\ iso _TestRedisHashHdelProperty is
 // Command builder property-based tests — key-value pairs pattern
 // ---------------------------------------------------------------------------
 class \nodoc\ iso _TestRedisStringMsetProperty is
-  Property1[Array[(String, String)] val]
+  Property[Array[(String, String)] val]
   fun name(): String => "RedisString/mset/Property"
 
   fun gen(): Generator[Array[(String, String)] val] =>

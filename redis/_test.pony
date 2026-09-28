@@ -1,5 +1,4 @@
 use "buffered"
-use "pony_check"
 use "pony_test"
 
 actor \nodoc\ Main is TestList
@@ -8,10 +7,10 @@ actor \nodoc\ Main is TestList
 
   fun tag tests(test: PonyTest) =>
     // Parser property tests
-    test(Property1UnitTest[RespValue](_TestRespParserRoundtrip))
-    test(Property1UnitTest[RespValue](_TestRespParserValidBytesAlwaysParse))
-    test(Property1UnitTest[RespValue](_TestRespParserIncompleteReturnsNone))
-    test(Property1UnitTest[U8](_TestRespParserInvalidTypeByteErrors))
+    test.property(_TestRespParserRoundtrip)
+    test.property(_TestRespParserValidBytesAlwaysParse)
+    test.property(_TestRespParserIncompleteReturnsNone)
+    test.property(_TestRespParserInvalidTypeByteErrors)
 
     // Parser example tests
     test(_TestRespParserEmptyBuffer)
@@ -34,10 +33,8 @@ actor \nodoc\ Main is TestList
     test(_TestRespParserPush)
 
     // Serializer property tests
-    test(Property1UnitTest[Array[ByteSeq] val](
-      _TestRespSerializerCommandRoundtrip))
-    test(Property1UnitTest[Array[ByteSeq] val](
-      _TestRespSerializerOutputIsValidResp))
+    test.property(_TestRespSerializerCommandRoundtrip)
+    test.property(_TestRespSerializerOutputIsValidResp)
 
     // Serializer example tests
     test(_TestRespSerializerSimpleCommand)
@@ -76,39 +73,32 @@ actor \nodoc\ Main is TestList
     test(_TestBuildAuthCommand)
 
     // RespConvert property tests
-    test(Property1UnitTest[RespValue](_TestRespConvertAsString))
-    test(Property1UnitTest[RespValue](_TestRespConvertAsBytes))
-    test(Property1UnitTest[RespValue](_TestRespConvertAsInteger))
-    test(Property1UnitTest[RespValue](_TestRespConvertAsBool))
-    test(Property1UnitTest[RespValue](_TestRespConvertAsArray))
-    test(Property1UnitTest[RespValue](_TestRespConvertAsDouble))
-    test(Property1UnitTest[RespValue](_TestRespConvertAsBigNumber))
-    test(Property1UnitTest[RespValue](_TestRespConvertAsMap))
-    test(Property1UnitTest[RespValue](_TestRespConvertAsSet))
-    test(Property1UnitTest[RespValue](_TestRespConvertAsError))
-    test(Property1UnitTest[RespValue](_TestRespConvertIsOk))
+    test.property(_TestRespConvertAsString)
+    test.property(_TestRespConvertAsBytes)
+    test.property(_TestRespConvertAsInteger)
+    test.property(_TestRespConvertAsBool)
+    test.property(_TestRespConvertAsArray)
+    test.property(_TestRespConvertAsDouble)
+    test.property(_TestRespConvertAsBigNumber)
+    test.property(_TestRespConvertAsMap)
+    test.property(_TestRespConvertAsSet)
+    test.property(_TestRespConvertAsError)
+    test.property(_TestRespConvertIsOk)
 
     // RespConvert example tests
     test(_TestRespConvertIsOkExamples)
     test(_TestRespConvertAsErrorBulkExample)
 
     // Command builder property tests
-    test(Property1UnitTest[Array[String] val](_TestRedisKeyDelProperty))
-    test(Property1UnitTest[Array[String] val](_TestRedisKeyExistsProperty))
-    test(Property1UnitTest[Array[String] val](
-      _TestRedisStringMgetProperty))
-    test(Property1UnitTest[(String, Array[String] val)](
-      _TestRedisListLpushProperty))
-    test(Property1UnitTest[(String, Array[String] val)](
-      _TestRedisListRpushProperty))
-    test(Property1UnitTest[(String, Array[String] val)](
-      _TestRedisSetSaddProperty))
-    test(Property1UnitTest[(String, Array[String] val)](
-      _TestRedisSetSremProperty))
-    test(Property1UnitTest[(String, Array[String] val)](
-      _TestRedisHashHdelProperty))
-    test(Property1UnitTest[Array[(String, String)] val](
-      _TestRedisStringMsetProperty))
+    test.property(_TestRedisKeyDelProperty)
+    test.property(_TestRedisKeyExistsProperty)
+    test.property(_TestRedisStringMgetProperty)
+    test.property(_TestRedisListLpushProperty)
+    test.property(_TestRedisListRpushProperty)
+    test.property(_TestRedisSetSaddProperty)
+    test.property(_TestRedisSetSremProperty)
+    test.property(_TestRedisHashHdelProperty)
+    test.property(_TestRedisStringMsetProperty)
 
     // Command builder example tests
     test(_TestRedisServerExamples)
