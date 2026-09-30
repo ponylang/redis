@@ -1,11 +1,10 @@
-use "pony_check"
 use "pony_test"
 
 // ---------------------------------------------------------------------------
 // RespConvert property-based tests
 // ---------------------------------------------------------------------------
 
-class \nodoc\ iso _TestRespConvertAsString is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsString is Property[RespValue]
   fun name(): String => "RespConvert/as_string/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -42,7 +41,7 @@ class \nodoc\ iso _TestRespConvertAsString is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertAsBytes is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsBytes is Property[RespValue]
   fun name(): String => "RespConvert/as_bytes/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -74,7 +73,7 @@ class \nodoc\ iso _TestRespConvertAsBytes is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertAsInteger is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsInteger is Property[RespValue]
   fun name(): String => "RespConvert/as_integer/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -99,7 +98,7 @@ class \nodoc\ iso _TestRespConvertAsInteger is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertAsBool is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsBool is Property[RespValue]
   fun name(): String => "RespConvert/as_bool/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -124,7 +123,7 @@ class \nodoc\ iso _TestRespConvertAsBool is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertAsArray is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsArray is Property[RespValue]
   fun name(): String => "RespConvert/as_array/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -150,7 +149,7 @@ class \nodoc\ iso _TestRespConvertAsArray is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertAsDouble is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsDouble is Property[RespValue]
   fun name(): String => "RespConvert/as_double/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -175,7 +174,7 @@ class \nodoc\ iso _TestRespConvertAsDouble is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertAsBigNumber is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsBigNumber is Property[RespValue]
   fun name(): String => "RespConvert/as_big_number/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -200,7 +199,7 @@ class \nodoc\ iso _TestRespConvertAsBigNumber is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertAsMap is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsMap is Property[RespValue]
   fun name(): String => "RespConvert/as_map/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -226,7 +225,7 @@ class \nodoc\ iso _TestRespConvertAsMap is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertAsSet is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsSet is Property[RespValue]
   fun name(): String => "RespConvert/as_set/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -252,7 +251,7 @@ class \nodoc\ iso _TestRespConvertAsSet is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertAsError is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertAsError is Property[RespValue]
   fun name(): String => "RespConvert/as_error/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
@@ -278,7 +277,7 @@ class \nodoc\ iso _TestRespConvertAsError is Property1[RespValue]
       end
     end
 
-class \nodoc\ iso _TestRespConvertIsOk is Property1[RespValue]
+class \nodoc\ iso _TestRespConvertIsOk is Property[RespValue]
   fun name(): String => "RespConvert/is_ok/Property"
 
   fun gen(): Generator[RespValue] => _RespGens.value()
