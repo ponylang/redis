@@ -443,14 +443,14 @@ actor \nodoc\ _PipelineClient is (SessionStatusNotify & ResultReceiver)
 
   be redis_session_ready(session: Session) =>
     // Pipeline 5 SET commands at once.
-    for i in Range(0, 5) do
+    for i in Range[USize].till(0, 5) do
       let key: String val = "_test_pipeline_" + i.string()
       let value: String val = "value_" + i.string()
       let cmd: Array[ByteSeq] val = ["SET"; key; value]
       session.execute(cmd, this)
     end
     // Then pipeline 5 GET commands.
-    for i in Range(0, 5) do
+    for i in Range[USize].till(0, 5) do
       let key: String val = "_test_pipeline_" + i.string()
       let cmd: Array[ByteSeq] val = ["GET"; key]
       session.execute(cmd, this)
@@ -487,7 +487,7 @@ actor \nodoc\ _PipelineClient is (SessionStatusNotify & ResultReceiver)
       end
       if _step == 10 then
         // Clean up test keys.
-        for j in Range(0, 5) do
+        for j in Range[USize].till(0, 5) do
           let key: String val = "_test_pipeline_" + j.string()
           let cmd: Array[ByteSeq] val = ["DEL"; key]
           session.execute(cmd, this)
@@ -655,7 +655,7 @@ actor \nodoc\ _PipelineCloseClient is (SessionStatusNotify & ResultReceiver)
 
   be redis_session_ready(session: Session) =>
     // Pipeline 5 SET commands and immediately close.
-    for i in Range(0, 5) do
+    for i in Range[USize].till(0, 5) do
       let key: String val = "_test_pipeline_close_" + i.string()
       let cmd: Array[ByteSeq] val = ["SET"; key; "value"]
       session.execute(cmd, this)
